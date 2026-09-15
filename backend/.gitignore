@@ -1,0 +1,12 @@
+.env
+.env.*
+!.env.example
+example.env
+*.key
+*.pem
+__pycache__/
+*.py[cod]
+bis_compass.db
+bis_compass.db-journal
+uploads/
+*.log

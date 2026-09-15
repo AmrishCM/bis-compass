@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: ankane/pgvector:latest
+    container_name: bis-compass-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: bis_compass
+      POSTGRES_PASSWORD: bis_compass_password
+      POSTGRES_DB: bis_compass_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+
+  backend:
+    build: ./backend
+    container_name: bis-compass-backend
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env
+    ports:
+      - "8002:8000"
+    depends_on:
+      - postgres
+    volumes:
+      - ./backend:/app
+      - ./backend/logs:/app/logs
+
+  frontend:
+    build: ./frontend
+    container_name: bis-compass-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
