@@ -75,7 +75,7 @@ export const DocumentManagement: React.FC = () => {
             </h2>
 
             <label className="border-2 border-dashed border-slate-300 hover:border-emerald-500 bg-slate-50 hover:bg-emerald-50/20 rounded-xl p-8 flex flex-col items-center justify-center cursor-pointer transition-colors text-center">
-              <FileUp className="w-10 h-10 text-emerald-600 mb-2" />
+              <FileUp className="w-10 h-10 text-emerald-600 mb-2" aria-hidden="true" />
               <span className="text-xs font-semibold text-slate-800">
                 {file ? file.name : 'Click to select or drag and drop'}
               </span>
@@ -93,7 +93,7 @@ export const DocumentManagement: React.FC = () => {
             {file && (
               <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg flex items-center justify-between text-xs">
                 <div className="flex items-center space-x-2 truncate">
-                  <FileText className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <FileText className="w-4 h-4 text-emerald-600 shrink-0" aria-hidden="true" />
                   <span className="font-medium text-slate-800 truncate">{file.name}</span>
                 </div>
                 <span className="text-[11px] text-slate-500 font-mono shrink-0">
@@ -112,16 +112,16 @@ export const DocumentManagement: React.FC = () => {
             <button
               onClick={handleUpload}
               disabled={uploading || !file}
-              className="w-full py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-xs font-bold shadow-sm transition-all disabled:opacity-50 flex items-center justify-center space-x-2"
+              className="w-full flex items-center justify-center px-6 py-3.5 border border-transparent rounded-md shadow-sm text-base font-medium text-white bg-emerald-600 hover:bg-emerald-700 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:opacity-50 transition-colors duration-200"
             >
               {uploading ? (
                 <>
-                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  <RefreshCw className="w-4 h-4 animate-spin mr-2" />
                   <span>Extracting & Chunking Document...</span>
                 </>
               ) : (
                 <>
-                  <Sparkles className="w-4 h-4" />
+                  <Sparkles className="w-4 h-4 mr-2" />
                   <span>Ingest & Index Document</span>
                 </>
               )}
@@ -155,7 +155,7 @@ export const DocumentManagement: React.FC = () => {
             <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm space-y-5">
               <div className="flex items-center justify-between border-b border-slate-200 pb-3">
                 <div className="flex items-center space-x-2 text-xs font-bold text-emerald-800">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600" aria-hidden="true" />
                   <span>Ingestion & Chunking Complete</span>
                 </div>
                 <span className="text-[11px] font-mono text-slate-500">

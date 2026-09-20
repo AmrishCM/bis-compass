@@ -179,87 +179,206 @@ export interface InvestigatedSourceData {
   retrieved_at?: string;
 }
 
+export interface ClarificationQuestionItem {
+  id: string;
+  question: string;
+  type: string; // single_choice, multiple_choice, yes_no, numeric, text
+  options: string[];
+  why_we_need_this: string;
+  decision_impact: string;
+  // Legacy fields (backward compat)
+  why_needed?: string;
+  affects?: string[];
+  attribute_key?: string;
+}
+
+export interface ClarificationBlock {
+  title: string;
+  intro: string;
+  questions: ClarificationQuestionItem[];
+  explanation?: string;
+}
+
+export interface ProgressBlock {
+  product: string; // "current" | "done" | "pending" | "incomplete"
+  standard: string;
+  certification: string;
+  tests: string;
+  laboratory: string;
+  application: string;
+}
+
+export interface ProductBlock {
+  name: string;
+  description: string;
+  known_details: Record<string, string>;
+  missing_decision_critical_details: string[];
+}
+
+export interface StandardBlock {
+  standard_id?: number;
+  standard_number: string;
+  title: string;
+  status: string;
+  why_applies: string[];
+  official_source_url: string;
+  technical_clauses: Array<{ clause_number: string; heading: string; text: string }>;
+}
+
+export interface CertificationBlock {
+  status: string; // REQUIRED | VOLUNTARY | NOT VERIFIED
+  scheme: string;
+  why: string;
+  official_basis: string;
+  factory_audit_required: boolean;
+}
+
+export interface TestItem {
+  test_name: string;
+  what_it_checks: string;
+  test_method: string;
+  is_mandatory: boolean;
+  source_reference: string;
+}
+
+export interface LabItem {
+  lab_name: string;
+  address: string;
+  location: string;
+  phone?: string;
+  email?: string;
+  website?: string;
+  is_bis_recognized: boolean;
+  accredited_scopes?: string[];
+  testing_facilities?: string[];
+  match_score?: number;
+  match_reasons?: string[];
+}
+
+export interface ApplicationStep {
+  step_number: number;
+  title: string;
+  description: string;
+}
+
+export interface NextAction {
+  action: string;
+  details: string;
+}
+
+export interface StatusBanner {
+  type: string; // "verified" | "clarification" | "incomplete"
+  title: string;
+  message: string;
+}
+
 export interface AnalysisResponse {
   success: boolean;
+  session_id?: string;
+  state: string; // NEEDS_CLARIFICATION | READY | NO_STANDARD_FOUND
   execution_time_seconds: number;
-  product_understanding: ProductUnderstandingData;
+
+  // Core blocks
+  product: ProductBlock;
+  progress: ProgressBlock;
+  status_banner: StatusBanner;
+
+  // Phase A — Clarification
+  clarification: ClarificationBlock | null;
+
+  // Phase B — Compliance Roadmap
+  standard: StandardBlock | null;
+  certification: CertificationBlock | null;
+  tests: TestItem[];
+  laboratories: LabItem[];
+  application_steps: ApplicationStep[];
+  next_action: NextAction | null;
+
+  // Multi-product
+  multi_product_detected?: {
+    is_multi_product: boolean;
+    detected_products: string[];
+    message: string;
+  };
+
+  // Dual-Explanation Modes Data
+  msme_summary?: {
+    title: string;
+    plain_language_verdict: string;
+    top_action_items: string[];
+    estimated_readiness_time: string;
+    msme_concession_eligible: boolean;
+  };
+
+  auditor_matrix?: {
+    standard_id?: number;
+    standard_number?: string;
+    qco_order_ref?: string;
+    clause_citations: Array<{
+      clause_number: string;
+      heading: string;
+      criterion: string;
+      test_standard: string;
+      pass_criterion: string;
+      verification_status: string;
+    }>;
+    test_protocols: TestItem[];
+    confidence_score: number;
+  };
+
+  // Sample Preparation Guidance (Section 4)
+  sample_preparation_guidance?: {
+    sample_quantity: string;
+    preparation_and_conditioning: string;
+    packaging_and_sealing: string;
+    storage_and_handling: string;
+    test_parameter_checklist: string[];
+    labeling_instruction: string;
+  } | null;
+
+  // Profile-Tailored Document & Readiness Checklist (Section 3.2)
+  profile_readiness_checklists?: {
+    msme: {
+      title: string;
+      concession_badge: string;
+      documents: Array<{ item: string; mandatory: boolean }>;
+      in_house_equipment: Array<{ equipment: string; purpose: string }>;
+      factory_audit_focus: string;
+    };
+    startup: {
+      title: string;
+      concession_badge: string;
+      documents: Array<{ item: string; mandatory: boolean }>;
+      in_house_equipment: Array<{ equipment: string; purpose: string }>;
+      factory_audit_focus: string;
+    };
+    large: {
+      title: string;
+      concession_badge: string;
+      documents: Array<{ item: string; mandatory: boolean }>;
+      in_house_equipment: Array<{ equipment: string; purpose: string }>;
+      factory_audit_focus: string;
+    };
+  } | null;
+
+  // Backward-compat fields
+  final_status?: string;
   clarification_required?: boolean;
   clarification_questions?: string[];
-  applicable_standards: StandardMatch[];
+  clarification_question_items?: ClarificationQuestionItem[];
+  product_profile?: Record<string, any>;
+  product_understanding?: ProductUnderstandingData;
+  applicable_standards?: StandardMatch[];
   potential_standards?: StandardMatch[];
-  related_standards?: Array<{
-    standard_id: number;
-    standard_number: string;
-    title: string;
-    relation?: string;
-  }>;
-  rejected_candidates?: Array<{
-    standard_id: number;
-    standard_number: string;
-    title: string;
-    reason: string;
-    score: number;
-  }>;
-  research_trace?: {
-    queries_executed?: Array<any>;
-    urls_fetched?: Array<any>;
-    sources_accepted?: Array<any>;
-    sources_rejected?: Array<any>;
-  };
-  certification_info: CertificationInfoData[];
-  testing_information: TestingInfoData[];
-  laboratory_recommendations: LaboratoryData[];
-  compliance_analysis: ComplianceGapData[];
-  web_search_results: Array<{
-    title: string;
-    url: string;
-    snippet: string;
-    domain: string;
-    authority_score: number;
-  }>;
-  research_stages?: ResearchStageData[];
-  sources_investigated?: InvestigatedSourceData[];
-  is_live_research?: boolean;
-  session_id?: string;
-  pipeline?: {
-    sources_examined?: number;
-    authoritative_sources_used?: number;
-    retrieved_candidates: number;
-    scope_filtered: number;
-    applicable: number;
-    rejected: number;
-    is_live_research?: boolean;
-    web_search_used: boolean;
-  };
-  overall_assessment: string;
-  recommendations: string[];
-  what_you_need_to_do?: {
-    has_applicable_standard: boolean;
-    standard_number?: string;
-    title?: string;
-    status: string;
-    message?: string;
-    qco_status: string;
-    qco_message: string;
-    certification_scheme: string;
-    bis_certification_status: string;
-    testing_status: string;
-    tests: Array<{
-      test_name: string;
-      clause: string;
-      test_method: string;
-      requirement_type: string;
-      evidence_source: string;
-      is_mandatory: boolean;
-    }>;
-    next_actions: Array<{
-      step_number: number;
-      step_name: string;
-      description: string;
-      responsible_party: string;
-    }>;
-  };
-  canonical_decision?: Record<string, any>;
+  related_standards?: Array<any>;
+  rejected_candidates?: Array<any>;
+  certification_info?: CertificationInfoData[];
+  testing_information?: TestingInfoData[];
+  laboratory_recommendations?: LaboratoryData[];
+  step_by_step_roadmap?: any;
+  overall_assessment?: string;
+  recommendations?: string[];
+  _audit?: Record<string, any>;
 }
 
 export const api = {
@@ -272,11 +391,25 @@ export const api = {
   // Analysis
   async analyzeProduct(data: {
     product_description: string;
+    additional_details?: string;
     document_text?: string;
     location?: string;
     include_web_search?: boolean;
+    session_id?: string;
   }): Promise<AnalysisResponse> {
     const res = await apiClient.post<AnalysisResponse>('/analyze', data);
+    return res.data;
+  },
+
+  // Clarification (Sections 4, 7, 26, 27)
+  async clarifyProduct(data: {
+    session_id: string;
+    clarification_answer?: string;
+    answers?: Record<string, string>;
+    question?: string;
+    location?: string;
+  }): Promise<AnalysisResponse> {
+    const res = await apiClient.post<AnalysisResponse>('/analyze/clarify', data);
     return res.data;
   },
 
@@ -356,6 +489,51 @@ export const api = {
   // Audit Logs
   async getAuditLogs(params?: { action?: string; limit?: number; offset?: number }) {
     const res = await apiClient.get('/audit', { params });
+    return res.data;
+  },
+
+  // Standard Dependencies
+  async getStandardDependencies(id: number) {
+    const res = await apiClient.get(`/standards/${id}/dependencies`);
+    return res.data;
+  },
+
+  // Consumer Protection & Hallmarking
+  async verifyHUID(data: { huid: string; metal_type?: string; declared_purity?: string }) {
+    const res = await apiClient.post('/consumer/verify-huid', data);
+    return res.data;
+  },
+
+  async verifyCML(data: { cml_number: string; standard_number?: string }) {
+    const res = await apiClient.post('/consumer/verify-cml', data);
+    return res.data;
+  },
+
+  async draftGrievance(data: {
+    consumer_name: string;
+    consumer_phone: string;
+    consumer_email?: string;
+    complaint_category: string;
+    product_name: string;
+    standard_number?: string;
+    seller_name: string;
+    seller_location: string;
+    invoice_number?: string;
+    invoice_date?: string;
+    incident_description: string;
+  }) {
+    const res = await apiClient.post('/consumer/grievance/draft', data);
+    return res.data;
+  },
+
+  // Gazette & Updates Pipeline
+  async getGazetteUpdates(params?: { ministry?: string; status?: string; search?: string }) {
+    const res = await apiClient.get('/updates/gazette', { params });
+    return res.data;
+  },
+
+  async triggerGazetteSync() {
+    const res = await apiClient.post('/updates/sync');
     return res.data;
   },
 };

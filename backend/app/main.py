@@ -20,7 +20,9 @@ from app.api.routes import (
     audit_router,
     ai_health_router,
     research_health_router,
-    translate_router
+    translate_router,
+    consumer_router,
+    updates_router
 )
 
 logging.basicConfig(
@@ -71,6 +73,8 @@ app.include_router(audit_router, prefix="/api")
 app.include_router(ai_health_router, prefix="/api")
 app.include_router(research_health_router, prefix="/api")
 app.include_router(translate_router, prefix="/api")
+app.include_router(consumer_router, prefix="/api")
+app.include_router(updates_router, prefix="/api")
 
 @app.get("/")
 async def root():

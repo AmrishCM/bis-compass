@@ -266,7 +266,7 @@ class ComplianceGapAgent:
                 confidence=confidence,
                 risk_level=risk_level,
                 recommendations=recommendations,
-                source_documents=source_documents
+                source_documents=source_docs
             )
 
         except Exception as e:
@@ -778,9 +778,9 @@ class ComplianceGapAgent:
         final_score = max(best_match_score, content_score)
 
         # Determine fulfillment status
-        if final_score >= 0.8:
+        if final_score >= 0.65:
             return "fulfilled"
-        elif final_score >= 0.5:
+        elif final_score >= 0.4:
             return "partial"
         else:
             return "missing"
@@ -857,10 +857,41 @@ class ComplianceGapAgent:
             if matches > 0:
                 score += min(0.3, matches * 0.1)
 
-        # Check for specific details from standard_req.details
+        # Check for semantic / keyword overlap between clause and content
         details = standard_req.details or {}
+        clause_heading = (details.get("clause_heading") or "").lower()
+        clause_text = (details.get("clause_text") or req_text_lower).lower()
+        
+        # Extract meaningful domain keywords (length >= 4) from requirement
+        combined_req_text = f"{clause_heading} {clause_text}"
+        req_words = set(re.findall(r'\b[a-z]{4,}\b', combined_req_text)) - {
+            "shall", "must", "with", "from", "when", "that", "this", "each", "which", "into", "than", "been", "have", "will"
+        }
+        
+        content_words = set(re.findall(r'\b[a-z]{4,}\b', content_lower))
+        if req_words:
+            overlap = req_words.intersection(content_words)
+            overlap_ratio = len(overlap) / min(len(req_words), 8)
+            score += min(0.6, overlap_ratio * 0.6)
+
+        # Check if the document explicitly mentions missing / pending for this clause
+        # e.g., "no drop test attached", "pending heavy metal test", etc.
+        missing_indicators = ["no ", "pending", "not yet", "missing", "not attached"]
+        is_explicitly_missing = False
+        for line in content_lower.split('\n'):
+            if any(ind in line for ind in missing_indicators):
+                line_words = set(re.findall(r'\b[a-z]{4,}\b', line))
+                if len(line_words.intersection(req_words)) >= 2:
+                    is_explicitly_missing = True
+                    break
+
+        if is_explicitly_missing:
+            # Penalize heavily so it appears as a missing gap
+            return 0.1
+
+        # Check for specific details from standard_req.details
         for key, value in details.items():
-            if isinstance(value, str) and value.lower() in content_lower:
+            if isinstance(value, str) and len(value) > 3 and value.lower() in content_lower:
                 score += 0.2
                 break
             elif isinstance(value, (int, float)) and str(value) in content_lower:
@@ -869,14 +900,12 @@ class ComplianceGapAgent:
 
         # If product understanding provided, check for consistency
         if product_understanding:
-            # Check material consistency
             if req_type_lower == "materials":
                 product_materials = [m.lower() for m in product_understanding.materials]
                 std_material = details.get("material", "").lower()
                 if std_material and std_material in product_materials:
                     score += 0.3
 
-            # Check intended use consistency
             if req_type_lower == "intended use":
                 product_use = product_understanding.intended_use.lower()
                 if "use" in req_text_lower and product_use in req_text_lower:

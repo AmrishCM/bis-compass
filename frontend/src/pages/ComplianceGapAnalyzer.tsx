@@ -44,7 +44,7 @@ Missing details from documentation:
   water_heater: {
     title: "Electric Storage Water Heater - Technical Data Sheet",
     standard_number: "IS 302-2-15:2009",
-    standard_id: 3,
+    standard_id: 2,
     text: `TECHNICAL SPECIFICATION: Electric Storage Water Heater (Geyser)
 Model: AquaSafe-25L Domestic
 Rated Voltage: 230V AC, 50Hz, Single Phase

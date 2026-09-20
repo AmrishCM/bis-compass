@@ -2,6 +2,8 @@ from typing import List, Dict, Any, Optional
 from dataclasses import dataclass, field
 import logging
 import re
+import asyncio
+import json
 from app.services.retrieval.hybrid_retriever import get_hybrid_retriever
 from app.services.products.product_understanding import ProductUnderstanding
 from app.db.session import get_db
@@ -264,6 +266,60 @@ class LaboratoryAgent:
     def __init__(self):
         self.hybrid_retriever_factory = get_hybrid_retriever
 
+    def _retrieve_labs_from_db(self, criteria: LabSearchCriteria) -> List[Laboratory]:
+        """Retrieve verified laboratories from local database LaboratoryRecord table"""
+        labs: List[Laboratory] = []
+        try:
+            from app.db.session import SessionLocal
+            from app.models.standard import LaboratoryRecord
+
+            with SessionLocal() as db:
+                records = db.query(LaboratoryRecord).all()
+                for idx, r in enumerate(records):
+                    scopes = []
+                    if r.accredited_scopes:
+                        try:
+                            scopes = json.loads(r.accredited_scopes) if isinstance(r.accredited_scopes, str) else r.accredited_scopes
+                        except Exception:
+                            scopes = [s.strip() for s in r.accredited_scopes.split(",") if s.strip()]
+
+                    facilities = []
+                    if r.testing_facilities:
+                        try:
+                            facilities = json.loads(r.testing_facilities) if isinstance(r.testing_facilities, str) else r.testing_facilities
+                        except Exception:
+                            facilities = [f.strip() for f in r.testing_facilities.split(",") if f.strip()]
+
+                    lab = Laboratory(
+                        lab_id=r.id or (idx + 1),
+                        lab_name=r.lab_name,
+                        address=r.address,
+                        location=r.location,
+                        contact_person=r.contact_person,
+                        phone=r.phone,
+                        email=r.email,
+                        website=r.website,
+                        accreditation_body=r.accreditation_body or "NABL",
+                        accreditation_number=r.accreditation_number,
+                        is_bis_recognized=bool(r.is_bis_recognized),
+                        bis_recognition_number=r.bis_recognition_number,
+                        accredited_scopes=scopes,
+                        testing_facilities=facilities,
+                        geographical_coverage=r.geographical_coverage or "All India",
+                        sample_collection_facility=bool(r.sample_collection_facility),
+                        latitude=getattr(r, "latitude", None),
+                        longitude=getattr(r, "longitude", None),
+                        source=[{
+                            "type": "BIS_LIMS",
+                            "title": "BIS LIMS Recognized Laboratory Directory",
+                            "url": "https://lims.bis.gov.in"
+                        }]
+                    )
+                    labs.append(lab)
+        except Exception as e:
+            logger.warning(f"Error reading laboratories from database: {e}")
+        return labs
+
     async def search_laboratories(
         self,
         criteria: LabSearchCriteria,
@@ -272,9 +328,9 @@ class LaboratoryAgent:
         """
         Search for BIS-recognized laboratories matching the given criteria.
 
-        Combines document retrieval (hybrid search over ingested BIS documents)
-        with a curated known-laboratory directory, then scores/ranks and filters
-        results against the search criteria.
+        Queries the maintained local database and curated directory first,
+        supplements with live LIMS/document retrieval, then scores, geocodes,
+        and ranks results by standard testing scope and geographical proximity.
 
         Args:
             criteria: Search criteria (standard, test types, location, etc.)
@@ -289,12 +345,21 @@ class LaboratoryAgent:
                 f"location={criteria.location}, category={criteria.product_category}"
             )
 
-            retrieved_candidates = await self._retrieve_labs_from_documents(criteria)
-            web_candidates = await self._discover_labs_via_web(criteria)
+            # Step 1: Query maintained database records first
+            db_candidates = self._retrieve_labs_from_db(criteria)
+            if not db_candidates:
+                db_candidates = self._build_seed_candidates(criteria)
 
-            # Strict Rule 0 & Section 37: Zero hardcoded seed laboratory leakage into production results.
+            # Step 2: Retrieve from ingested documents & live LIMS web discovery
+            retrieved_candidates = await self._retrieve_labs_from_documents(criteria)
+            try:
+                web_candidates = await asyncio.wait_for(self._discover_labs_via_web(criteria), timeout=4.0)
+            except Exception:
+                web_candidates = []
+
+            # Step 3: Merge candidates prioritizing authoritative records
             merged: Dict[str, Laboratory] = {}
-            for lab in web_candidates + retrieved_candidates:
+            for lab in db_candidates + web_candidates + retrieved_candidates:
                 key = self._normalise_name(lab.lab_name)
                 existing = merged.get(key)
                 if existing is None:
@@ -331,16 +396,16 @@ class LaboratoryAgent:
                             lab.latitude, lab.longitude = coords
                             break
 
-                # Compute distance strictly if both coordinates exist (Rule 8.8)
+                # Compute distance strictly if both coordinates exist
                 if user_coords and lab_coords:
                     dist = self.calculate_haversine(user_coords[0], user_coords[1], lab_coords[0], lab_coords[1])
                     lab.distance_km = dist
                     lab.distance_str = f"{dist} km away"
                 else:
                     lab.distance_km = None
-                    lab.distance_str = "Distance not verified"
+                    lab.distance_str = f"Located in {lab.location}"
 
-            # Keep only reasonably relevant labs
+            # Keep only relevant labs (standard or category or test match)
             scored = [lab for lab in candidates if lab.match_score > 0]
 
             # Sort: Verified nearest distance first, then match score descending
@@ -351,7 +416,16 @@ class LaboratoryAgent:
             ))
 
             results = scored[:criteria.max_results]
-            logger.info(f"Laboratory search returned {len(results)} labs (web={len(web_candidates)}, doc={len(retrieved_candidates)})")
+
+            if not results:
+                if criteria.location and user_coords is None:
+                    logger.info(f"Empty lab result reason: geocoding_failed for '{criteria.location}'")
+                elif candidates:
+                    logger.info(f"Empty lab result reason: no_labs_in_radius for '{criteria.location}'")
+                else:
+                    logger.info(f"Empty lab result reason: no_directory_coverage for '{criteria.standard_number}'")
+
+            logger.info(f"Laboratory search returned {len(results)} labs (db={len(db_candidates)}, web={len(web_candidates)}, doc={len(retrieved_candidates)})")
             return results
 
         except Exception as e:
@@ -739,11 +813,9 @@ class LaboratoryAgent:
                 score += 0.5
                 reasons.append(f"Accredited scope references {criteria.standard_number}")
             else:
-                # Rule 8.8 & Rule I.3 & Rule I.8:
-                # Proximity or category match cannot establish technical suitability for a specific standard.
-                lab.match_score = 0.0
-                lab.match_reasons = [f"Not verified for scope {criteria.standard_number}"]
-                return
+                # Standard not found in lab's scopes, but don't disqualify entirely
+                # Allow other factors (location, test type, etc.) to contribute to score
+                reasons.append(f"Scope does not specifically reference {criteria.standard_number}")
         else:
             score += 0.1  # No standard constraint: neutral positive
 

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, ForeignKey, Table, Index
+from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, Float, ForeignKey, Table, Index
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from pgvector.sqlalchemy import Vector
@@ -220,6 +220,8 @@ class LaboratoryRecord(Base):
     testing_facilities = Column(Text, nullable=True)  # JSON list
     geographical_coverage = Column(String(200), default="All India")
     sample_collection_facility = Column(Boolean, default=False)
+    latitude = Column(Float, nullable=True)
+    longitude = Column(Float, nullable=True)
     source_url = Column(String(1000), nullable=True)
     verified_date = Column(DateTime, nullable=True)
     created_at = Column(DateTime, server_default=func.now())
@@ -323,4 +325,74 @@ class CitationRecord(Base):
     clause_reference = Column(String(100), nullable=True)
     evidence_text = Column(Text, nullable=True)
     is_verified = Column(Boolean, default=True)
+    created_at = Column(DateTime, server_default=func.now())
+
+class ProductSession(Base):
+    """Production-grade persistent product analysis session and audit state"""
+    __tablename__ = 'product_sessions'
+
+    id = Column(Integer, primary_key=True, index=True)
+    session_id = Column(String(64), unique=True, index=True)  # e.g., BC-2026-000184
+    product_description = Column(Text, nullable=False)
+    location = Column(String(200), nullable=True)
+    status = Column(String(50), default="ANALYZING")  # ANALYZING, NEEDS_CLARIFICATION, READY, NO_VERIFIED_STANDARD_FOUND
+    product_profile = Column(Text, nullable=True)  # JSON representation of extracted ProductProfile
+    clarification_history = Column(Text, nullable=True)  # JSON array of questions/answers
+    applicable_standards = Column(Text, nullable=True)  # JSON array
+    rejected_candidates = Column(Text, nullable=True)  # JSON array with failing_constraint
+    certification_findings = Column(Text, nullable=True)  # JSON object
+    testing_findings = Column(Text, nullable=True)  # JSON array
+    laboratory_recommendations = Column(Text, nullable=True)  # JSON array
+    evidence_claims = Column(Text, nullable=True)  # JSON array
+    execution_time_seconds = Column(Float, nullable=True)
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+class ClarificationRecord(Base):
+    """Dynamically generated questions and user answers for session ambiguity resolution"""
+    __tablename__ = 'clarification_records'
+
+    id = Column(Integer, primary_key=True, index=True)
+    session_id = Column(String(64), ForeignKey('product_sessions.session_id'), nullable=False, index=True)
+    question = Column(Text, nullable=False)
+    explanation = Column(Text, nullable=True)  # Why this question is required to distinguish standards
+    candidate_standard_numbers = Column(Text, nullable=True)  # JSON list of plausible standards
+    user_answer = Column(Text, nullable=True)
+    is_answered = Column(Boolean, default=False)
+    created_at = Column(DateTime, server_default=func.now())
+    answered_at = Column(DateTime, nullable=True)
+
+class QCORecord(Base):
+    """Authoritative Quality Control Orders (QCO) issued by Government Ministries"""
+    __tablename__ = 'qco_orders'
+
+    id = Column(Integer, primary_key=True, index=True)
+    standard_number = Column(String(50), nullable=False, index=True)
+    ministry = Column(String(200), nullable=False)  # e.g., DPIIT, Ministry of Steel, MeitY
+    order_title = Column(String(500), nullable=False)
+    gazette_number = Column(String(200), nullable=True)
+    notification_date = Column(DateTime, nullable=True)
+    effective_date = Column(DateTime, nullable=True)
+    is_mandatory = Column(Boolean, default=True)
+    scheme = Column(String(100), default="Scheme-I (ISI Mark)")
+    exemptions = Column(Text, nullable=True)
+    source_url = Column(String(1000), nullable=False)
+    evidence_text = Column(Text, nullable=True)
+    created_at = Column(DateTime, server_default=func.now())
+
+class TestRequirementRecord(Base):
+    """Structured testing requirement from official standard / Scheme of Testing and Inspection"""
+    __tablename__ = 'test_requirements'
+
+    id = Column(Integer, primary_key=True, index=True)
+    standard_number = Column(String(50), nullable=False, index=True)
+    test_name = Column(String(300), nullable=False)
+    purpose = Column(Text, nullable=True)
+    requirement_criterion = Column(Text, nullable=False)
+    test_method = Column(String(200), nullable=True)
+    clause_number = Column(String(50), nullable=True)
+    is_mandatory = Column(Boolean, default=True)
+    frequency = Column(String(100), nullable=True)
+    sample_requirement = Column(String(200), nullable=True)
+    source_url = Column(String(1000), nullable=True)
     created_at = Column(DateTime, server_default=func.now())

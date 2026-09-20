@@ -10,6 +10,7 @@ import json
 import re
 
 from app.services.products.product_understanding import ProductUnderstanding
+from app.services.products.product_profile import ProductProfile, MultiProductDetection
 from app.services.llm.provider_factory import get_llm_provider
 from app.core.exceptions import AIServiceUnavailableException
 
@@ -219,6 +220,20 @@ class OpenWorldProductAnalyzer:
         if "Food" in industry or any("FSSAI" in d for d in reg_domains):
             search_terms.append(f"{normalized_name} FSSAI standard regulation India")
 
+        # Detect multiple products if present
+        multi_detection = self._detect_multi_product(clean_text)
+
+        # Build structured ProductProfile
+        profile = self._build_product_profile(
+            clean_text=clean_text,
+            product_name=product_name,
+            industry=industry,
+            materials=materials,
+            intended_use=intended_use,
+            physical_form=physical_form,
+            technical_attributes=technical_attributes
+        )
+
         return ProductUnderstanding(
             product_name=product_name,
             normalized_product_name=normalized_name,
@@ -238,7 +253,132 @@ class OpenWorldProductAnalyzer:
             confidence=final_confidence,
             clarification_required=clarification_req,
             clarification_questions=clarification_q,
-            search_terms=search_terms
+            search_terms=search_terms,
+            product_profile=profile.dict(),
+            multi_product_detected=multi_detection.dict() if multi_detection.is_multi_product else None
+        )
+
+    def _detect_multi_product(self, text: str) -> MultiProductDetection:
+        """Detect multi-product lists in user description (Section 29)"""
+        lower = text.lower().strip()
+        cleaned = re.sub(r'^(?:we\s+manufacture|i\s+manufacture|we\s+make|i\s+make|we\s+produce|we\s+sell)\s*', '', lower)
+        parts = re.split(r',\s*|\s+and\s+', cleaned)
+        valid_items = [p.strip() for p in parts if len(p.strip().split()) >= 1 and len(p.strip()) > 3]
+
+        keywords = ["bottle", "cable", "switch", "pipe", "heater", "helmet", "battery", "toy", "t-shirt", "cement", "wire", "oil", "food", "textile", "valve"]
+        distinct_found = []
+        for item in valid_items:
+            for kw in keywords:
+                if kw in item and not any(kw in existing for existing in distinct_found):
+                    distinct_found.append(item.title())
+                    break
+
+        if len(distinct_found) >= 2:
+            return MultiProductDetection(
+                is_multi_product=True,
+                detected_products=distinct_found,
+                message=f"You mentioned manufacturing {len(distinct_found)} distinct products: {', '.join(distinct_found)}. Please choose which one to evaluate first."
+            )
+        return MultiProductDetection(is_multi_product=False)
+
+    def _build_product_profile(
+        self,
+        clean_text: str,
+        product_name: str,
+        industry: str,
+        materials: List[str],
+        intended_use: str,
+        physical_form: str,
+        technical_attributes: Dict[str, Any]
+    ) -> ProductProfile:
+        """Constructs structured product profile with confirmed vs unknown attributes"""
+        text_lower = clean_text.lower()
+        p_lower = product_name.lower()
+
+        # Insulation
+        insulation = None
+        if any(k in text_lower for k in ["vacuum insulated", "vacuum flask", "vacuum"]):
+            insulation = "vacuum insulated"
+        elif any(k in text_lower for k in ["insulated", "thermal"]):
+            insulation = "insulated"
+        elif "single wall" in text_lower or "single-wall" in text_lower or "uninsulated" in text_lower:
+            insulation = "single-wall"
+
+        # Construction
+        construction = None
+        if "double wall" in text_lower or "double-wall" in text_lower:
+            construction = "double-wall"
+        elif "single wall" in text_lower or "single-wall" in text_lower:
+            construction = "single-wall"
+
+        # Capacity
+        capacity = None
+        cap_match = re.search(r'\b(\d+(?:\.\d+)?\s*(?:ml|l|litre|litres|liter|liters|kg|g))\b', text_lower)
+        if cap_match:
+            capacity = cap_match.group(1)
+
+        # Voltage
+        voltage = None
+        volt_match = re.search(r'\b(\d+(?:\.\d+)?\s*(?:kv|v|volts?))\b', text_lower)
+        if volt_match:
+            voltage = volt_match.group(1)
+
+        # Operating Environment
+        environment = None
+        if any(k in text_lower for k in ["domestic", "household", "home"]):
+            environment = "domestic"
+        elif any(k in text_lower for k in ["industrial", "commercial"]):
+            environment = "industrial"
+
+        # Conductor
+        conductor = None
+        if "copper" in text_lower:
+            conductor = "copper"
+        elif "aluminium" in text_lower or "aluminum" in text_lower:
+            conductor = "aluminium"
+
+        # Identify unknown attributes based on domain
+        unknowns = []
+        is_bottle = any(k in p_lower or k in text_lower for k in ["bottle", "flask", "drinkware", "vessel", "tumbler", "mug"])
+        if is_bottle:
+            if not insulation:
+                unknowns.append("insulation")
+            if not construction:
+                unknowns.append("construction")
+            if not capacity:
+                unknowns.append("capacity")
+            if not environment:
+                unknowns.append("operating_environment")
+
+        is_cable = any(k in p_lower or k in text_lower for k in ["cable", "wire", "conductor"])
+        if is_cable:
+            if not voltage:
+                unknowns.append("voltage_range")
+            if not conductor:
+                unknowns.append("conductor_material")
+
+        is_garment = any(k in p_lower or k in text_lower for k in ["t-shirt", "shirt", "garment", "apparel"])
+        if is_garment:
+            if not any(k in text_lower for k in ["knitted", "knit", "woven"]):
+                unknowns.append("fabric_construction")
+            if not any(k in text_lower for k in ["men", "women", "kids", "unisex"]):
+                unknowns.append("demographic_category")
+
+        mat_str = ", ".join(materials) if materials else None
+
+        return ProductProfile(
+            product_name=product_name,
+            product_category=industry if industry != "Not confidently identified" else None,
+            material=mat_str,
+            intended_use=intended_use if intended_use and "functional usage" not in intended_use.lower() else None,
+            insulation=insulation,
+            construction=construction,
+            capacity=capacity,
+            voltage_rating=voltage,
+            conductor_material=conductor,
+            operating_environment=environment,
+            unknown_attributes=unknowns,
+            additional_attributes=technical_attributes or {}
         )
 
     def _is_vague_material_input(self, text: str) -> bool:
@@ -325,9 +465,16 @@ class OpenWorldProductAnalyzer:
         p_name = self._sanitize_product_name(text)
         lower = text.lower()
         extracted_materials = []
-        for m in ["stainless steel", "steel", "cotton", "pvc", "copper", "aluminum", "plastic", "rubber", "glass", "leather", "polymer"]:
+        for m in ["stainless steel", "steel", "cotton", "pvc", "copper", "aluminum", "plastic", "rubber", "glass", "leather", "polymer", "seaweed", "paper", "wood", "jute", "silk", "wool", "ceramic"]:
             if m in lower and m.title() not in extracted_materials:
                 extracted_materials.append(m.title())
+
+        # Also capture hyphenated material compounds like 'seaweed-based'
+        based_match = re.search(r'\b([a-zA-Z]+)-based\b', lower)
+        if based_match:
+            cand = based_match.group(1).title()
+            if cand not in extracted_materials and cand.lower() not in ["bio", "plant", "water", "oil"]:
+                extracted_materials.append(cand)
 
         industry = "Consumer Goods & Household"
         if any(k in lower for k in ["cable", "wire", "switch", "motor", "electronic", "battery"]):

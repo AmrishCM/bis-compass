@@ -74,15 +74,16 @@ class HybridRetriever:
             return await self._lexical_search(query, limit, filters)
 
     async def _get_query_embedding(self, query: str) -> List[float]:
-        """Generate embedding for the query text"""
+        """Generate embedding for the query text using live NVIDIA NIM embedding API"""
         try:
-            # Use LLM provider to get embedding
-            # In a real implementation, we'd have a dedicated embedding service
-            # For now, we'll simulate or use a simple approach
-            # This would be replaced with actual embedding generation
+            if hasattr(self.llm_provider, "embed"):
+                embeddings = await self.llm_provider.embed([query])
+                if embeddings and len(embeddings[0]) > 0:
+                    return embeddings[0]
+        except Exception as emb_err:
+            logger.warning(f"Live embedding API call failed: {emb_err}. Using deterministic normalized vector fallback.")
 
-            # Placeholder: return a dummy embedding of appropriate size
-            # In production, this would call the NVIDIA embedding API
+        try:
             import hashlib
             import numpy as np
 
@@ -97,8 +98,7 @@ class HybridRetriever:
             return raw_vec.tolist()
 
         except Exception as e:
-            logger.error(f"Error generating query embedding: {str(e)}")
-            # Return zero vector as fallback
+            logger.error(f"Error generating query embedding fallback: {str(e)}")
             return [0.0] * 768
 
     async def _lexical_search(

@@ -1,6 +1,6 @@
 import re
 from typing import Dict, Any, List, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from app.services.llm.provider_factory import get_llm_provider
 import logging
 
@@ -11,12 +11,29 @@ class ProductUnderstanding(BaseModel):
     Open-world structured product understanding.
     Supports ANY arbitrary user product without predefined whitelists or taxonomies.
     """
-    product_name: str = Field(description="Specific name of the product")
+    product_name: str = Field(default="Product", description="Specific name of the product")
     normalized_product_name: str = Field(default="", description="Normalized/canonical name of product")
     product_description: str = Field(default="", description="Original or cleaned user product description")
     product_family: str = Field(default="", description="Inferred product family / broad product functional group")
     materials: List[str] = Field(default_factory=list, description="Materials used in the product")
     components: List[str] = Field(default_factory=list, description="Key components, parts, or assemblies")
+
+    @model_validator(mode="before")
+    @classmethod
+    def handle_aliases_and_defaults(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            if not data.get("product_name"):
+                data["product_name"] = (
+                    data.get("product_identity")
+                    or data.get("normalized_name")
+                    or data.get("normalized_product_name")
+                    or "Product"
+                )
+            if not data.get("normalized_product_name"):
+                data["normalized_product_name"] = data.get("normalized_name") or data.get("product_name", "")
+            if not data.get("industry_context") and data.get("industry"):
+                data["industry_context"] = data["industry"]
+        return data
     commercial_intent: str = Field(default="Manufacture / Sale", description="Commercial action: Sell, Manufacture, Import, Distribute, Export, or Test")
     intended_use: str = Field(default="", description="Intended use (domestic, commercial, industrial, medical, etc.)")
     application: str = Field(default="", description="Specific practical application / function")
@@ -38,6 +55,8 @@ class ProductUnderstanding(BaseModel):
     market: str = Field(default="Domestic", description="Target market")
     possible_standard_categories: List[str] = Field(default_factory=list)
     missing_information: List[str] = Field(default_factory=list)
+    product_profile: Optional[Dict[str, Any]] = Field(default=None, description="Structured ProductProfile mapping confirmed and unknown attributes")
+    multi_product_detected: Optional[Dict[str, Any]] = Field(default=None, description="Details if multiple products were specified")
 
 
 class ProductUnderstandingService:

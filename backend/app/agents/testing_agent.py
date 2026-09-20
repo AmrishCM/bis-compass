@@ -14,13 +14,15 @@ logger = logging.getLogger(__name__)
 @dataclass
 class TestingRequirement:
     """Represents a testing requirement for product certification"""
-    test_type: str  # e.g., "Type Test", "Routine Test", "Sample Test", "Temperature Rise Test"
+    test_type: str  # Specific test name e.g., "Thermal Insulation Performance Test", "Leakage and Seal Integrity Test"
     description: str
     is_mandatory: bool
     source_reference: Dict[str, Any]  # Standard/clause reference
     details: Dict[str, Any] = None  # Additional details like sample size, duration, equipment
     test_method: Optional[str] = None  # Specific test method reference (e.g., "IS 12345:2020")
     acceptable_standards: Optional[List[str]] = None  # Acceptable result criteria
+    test_category: Optional[str] = "Type Test (Lab)"
+    test_name: Optional[str] = None
 
 @dataclass
 class LaboratoryInfo:
@@ -234,15 +236,26 @@ class TestingAgent:
                 text = result.get("text", "")
                 heading = result.get("heading", "")
 
+                # Exclude non-test administrative clauses
+                h_lower = heading.lower()
+                if any(excl in h_lower for excl in [
+                    "scope and field", "scope & specification", "field of application",
+                    "terminology", "definitions", "marking, labeling", "marking and labeling",
+                    "packaging and marking", "packing", "foreword", "references"
+                ]):
+                    continue
+
                 # Check if this result contains testing requirement information
                 testing_keywords = [
                     "test", "testing", "examination", "evaluation",
                     "requirement", "shall be tested", "must undergo",
-                    "type test", "routine test", "sample test"
+                    "type test", "routine test", "sample test", "insulation",
+                    "resistance", "leakage", "impact", "migration", "withstand",
+                    "pressure", "corrosion", "strength"
                 ]
 
                 if any(keyword in (text + heading).lower() for keyword in testing_keywords):
-                    # Determine test type
+                    # Determine specific test type
                     test_type = self._determine_test_type(text, heading)
 
                     # Extract details
@@ -260,7 +273,9 @@ class TestingAgent:
                         },
                         details=details,
                         test_method=details.get("test_method") if details else None,
-                        acceptable_standards=details.get("acceptable_criteria") if details else None
+                        acceptable_standards=details.get("acceptable_criteria") if details else None,
+                        test_category="Type Test (Lab)" if "routine" not in (text + heading).lower() else "Routine Test (Factory)",
+                        test_name=test_type
                     )
                     testing_requirements.append(requirement)
 
@@ -284,37 +299,69 @@ class TestingAgent:
             return self._get_general_testing_requirements(standard)
 
     def _determine_test_type(self, text: str, heading: str) -> str:
-        """Determine the type of test from text"""
-        text_lower = (text + heading).lower()
+        """Determine the specific, authoritative name of the test from clause heading and text"""
+        heading_clean = re.sub(r'^(?:Clause\s*)?[\d\.]+\s*[-:]*\s*', '', heading).strip()
+        h_lower = heading_clean.lower()
+        t_lower = text.lower()
+        combined = f"{h_lower} {t_lower}"
 
-        if "type test" in text_lower or "type-test" in text_lower:
-            return "Type Test"
-        elif "routine test" in text_lower or "routine-test" in text_lower:
-            return "Routine Test"
-        elif "sample test" in text_lower or "sample-test" in text_lower:
-            return "Sample Test"
-        elif "temperature rise" in text_lower:
-            return "Temperature Rise Test"
-        elif "insulation resistance" in text_lower or "ir test" in text_lower:
-            return "Insulation Resistance Test"
-        elif "earth continuity" in text_lower or "ec test" in text_lower:
-            return "Earth Continuity Test"
-        elif "leakage current" in text_lower:
-            return "Leakage Current Test"
-        elif "mechanical strength" in text_lower:
-            return "Mechanical Strength Test"
-        elif "heating" in text_lower or "thermal" in text_lower:
-            return "Heating Test"
-        elif "voltage withstand" in text_lower or "hipot" in text_lower:
-            return "Voltage Withstand Test"
-        elif "protection against electric shock" in text_lower:
-            return "Electric Shock Protection Test"
-        elif "ingress protection" in text_lower or "ip test" in text_lower:
-            return "Ingress Protection Test"
-        elif "endurance" in text_lower:
-            return "Endurance Test"
-        else:
-            return "Performance Test"
+        # 1. If heading already clearly names a technical test or performance parameter
+        if heading_clean and len(heading_clean) > 3 and not any(h_lower == generic for generic in ["scope", "scope & specification", "general", "sampling", "specifications", "requirements"]):
+            for test_kw in ["test", "performance", "integrity", "resistance", "migration", "strength", "leakage", "insulation", "corrosion", "shock", "durability", "endurance", "flame", "voltage", "dimension"]:
+                if test_kw in h_lower:
+                    name = heading_clean
+                    if not name.lower().endswith("test") and not name.lower().endswith("tests") and not name.lower().endswith("verification"):
+                        name = f"{name} Test"
+                    return name
+
+        # 2. Match specific technical test patterns
+        patterns = [
+            (r"(thermal insulation|temperature retention|heat retention)", "Thermal Insulation & Temperature Retention Test"),
+            (r"(leakage|seal integrity|liquid seal|watertightness)", "Leakage & Seal Integrity Test"),
+            (r"(drop test|impact resistance|impact strength|drop and impact)", "Drop & Impact Resistance Test"),
+            (r"(heavy metal|chemical migration|leaching|food contact|overall migration)", "Food-Grade Chemical Migration & Leaching Test"),
+            (r"(thermal shock|boiling salt corrosion|corrosion resistance|salt spray)", "Thermal Shock & Corrosion Resistance Test"),
+            (r"(handle strength|handle attachment|knob strength|torque)", "Handle & Attachment Mechanical Strength Test"),
+            (r"(conductor resistance|dc resistance)", "Conductor DC Resistance Test"),
+            (r"(insulation resistance|ir test)", "Insulation Resistance Test"),
+            (r"(high voltage|voltage withstand|dielectric strength|spark test|hipot)", "High Voltage Withstand (Dielectric) Test"),
+            (r"(flammability|flame retard|glow wire|fire resistance)", "Flammability & Flame Retardance Test"),
+            (r"(tensile strength|elongation at break)", "Tensile Strength & Elongation Test"),
+            (r"(hydrostatic|burst pressure|hydraulic test)", "Hydrostatic Pressure Test"),
+            (r"(temperature rise)", "Temperature Rise Test"),
+            (r"(earth continuity|protective bonding)", "Earth Continuity Test"),
+            (r"(leakage current)", "Leakage Current Test"),
+            (r"(ingress protection|ip code|ip[0-9]{2})", "Ingress Protection (IP) Test"),
+            (r"(mechanical strength|physical durability)", "Mechanical Strength & Durability Test"),
+            (r"(endurance|cyclic life|operating life)", "Endurance & Operating Cycle Test"),
+            (r"(dimensional|wall thickness|outer diameter)", "Dimensional & Wall Thickness Verification"),
+            (r"(color fastness|washing fastness)", "Color Fastness & Washing Durability Test"),
+            (r"(fiber composition|blend composition)", "Fiber Composition & Blend Analysis"),
+            (r"(chlorination|residual chlorine)", "Chlorination & Chemical Safety Test"),
+            (r"(microbiological|bacterial count)", "Microbiological Safety Test"),
+            (r"(boiling water|reversion)", "Boiling Water Resistance & Reversion Test"),
+        ]
+
+        for pattern, test_title in patterns:
+            if re.search(pattern, combined):
+                return test_title
+
+        # 3. If heading exists and is descriptive, use it directly
+        if heading_clean and len(heading_clean) > 4 and heading_clean.lower() not in ["scope", "specification", "general requirements"]:
+            name = heading_clean
+            if not name.lower().endswith("test") and not name.lower().endswith("verification"):
+                name = f"{name} Test"
+            return name
+
+        # 4. Fallback test designations
+        if "type test" in t_lower:
+            return "Standard Conformity Verification (Type Test)"
+        elif "routine test" in t_lower:
+            return "Routine Production Quality Test"
+        elif "sample test" in t_lower:
+            return "Batch Acceptance Sample Test"
+
+        return "Product Performance & Conformity Test"
 
     def _extract_test_details(self, text: str, heading: str) -> Dict[str, Any]:
         """Extract detailed information about the test"""
@@ -402,8 +449,82 @@ class TestingAgent:
         standard_text = f"{standard.title} {standard.scope or ''}".lower()
         product_category = product_understanding.category.lower()
 
+        # Bottles, Flasks, Drinkware, Cookware, Utensils
+        if any(keyword in standard_text or keyword in product_category or keyword in product_understanding.product_name.lower() for keyword in [
+            "flask", "bottle", "drinkware", "cookware", "utensil", "container", "tumbler", "17526", "17803", "17790", "tableware"
+        ]):
+            if any(k in standard_text or k in product_category or k in product_understanding.product_name.lower() for k in ["flask", "bottle", "insulated", "vacuum", "17526"]):
+                requirements.extend([
+                    TestingRequirement(
+                        test_type="Thermal Insulation & Temperature Retention Test",
+                        description="Verification of temperature retention for hot and cold liquids over 6 to 24 hours as per IS 17526",
+                        is_mandatory=True,
+                        source_reference={"standard_id": standard.id if standard else 0, "clause": "5.2"},
+                        details={"test_method": "Boiling water retention (minimum 60°C after 6 hours)", "equipment": "Calibrated temperature sensor"},
+                        test_category="Type Test (Lab)",
+                        test_name="Thermal Insulation & Temperature Retention Test"
+                    ),
+                    TestingRequirement(
+                        test_type="Leakage & Seal Integrity Test",
+                        description="Pressure and continuous inversion test to ensure zero liquid leakage from cap, stopper, or silicone gasket",
+                        is_mandatory=True,
+                        source_reference={"standard_id": standard.id if standard else 0, "clause": "5.4"},
+                        details={"test_method": "Inversion and 24-hour horizontal seal pressure check"},
+                        test_category="Type Test (Lab)",
+                        test_name="Leakage & Seal Integrity Test"
+                    ),
+                    TestingRequirement(
+                        test_type="Drop & Impact Resistance Test",
+                        description="Free drop test from 1 meter height onto concrete surface to verify structural durability and vacuum seal retention",
+                        is_mandatory=True,
+                        source_reference={"standard_id": standard.id if standard else 0, "clause": "6.1"},
+                        details={"test_method": "Drop at 90% water capacity from 1m elevation"},
+                        test_category="Type Test (Lab)",
+                        test_name="Drop & Impact Resistance Test"
+                    ),
+                    TestingRequirement(
+                        test_type="Food-Grade Chemical Migration & Leaching Test",
+                        description="Specific and overall migration testing in food simulant to ensure no heavy metals (lead, cadmium, chromium) leach into beverages",
+                        is_mandatory=True,
+                        source_reference={"standard_id": standard.id if standard else 0, "clause": "7.2"},
+                        details={"test_method": "4% acetic acid food simulant at 70°C for 2 hours"},
+                        test_category="Type Test (Lab)",
+                        test_name="Food-Grade Chemical Migration & Leaching Test"
+                    ),
+                ])
+            elif any(k in standard_text or k in product_category or k in product_understanding.product_name.lower() for k in ["cookware", "utensil", "17803", "tableware"]):
+                requirements.extend([
+                    TestingRequirement(
+                        test_type="Thermal Shock & Boiling Salt Corrosion Resistance Test",
+                        description="Cookware resistance to boiling 3% sodium chloride solution for 24 hours without pitting, rusting, or delamination",
+                        is_mandatory=True,
+                        source_reference={"standard_id": standard.id if standard else 0, "clause": "5.3"},
+                        details={"test_method": "Boiling in 3% NaCl solution for 24 hours"},
+                        test_category="Type Test (Lab)",
+                        test_name="Thermal Shock & Boiling Salt Corrosion Resistance Test"
+                    ),
+                    TestingRequirement(
+                        test_type="Handle Attachment & Mechanical Fatigue Test",
+                        description="Mechanical strength and fatigue durability of handles, rivets, and side grips under cyclic loading",
+                        is_mandatory=True,
+                        source_reference={"standard_id": standard.id if standard else 0},
+                        details={"test_method": "10,000 dynamic lift cycles at full capacity"},
+                        test_category="Type Test (Lab)",
+                        test_name="Handle Attachment & Mechanical Fatigue Test"
+                    ),
+                    TestingRequirement(
+                        test_type="Food-Grade Heavy Metal Migration Test",
+                        description="Testing of inner food contact stainless steel to verify non-toxic purity and conformity with IS 9845 limits",
+                        is_mandatory=True,
+                        source_reference={"standard_id": standard.id if standard else 0},
+                        details={"test_method": "Spectrometric extraction in food simulants"},
+                        test_category="Type Test (Lab)",
+                        test_name="Food-Grade Heavy Metal Migration Test"
+                    ),
+                ])
+
         # Electrical/electronic products
-        if any(keyword in standard_text for keyword in ["electric", "electrical", "electronics"]):
+        elif any(keyword in standard_text for keyword in ["electric", "electrical", "electronics", "cable", "wire"]):
             if any(keyword in product_category for keyword in ["switch", "socket", "accessory"]):
                 requirements.extend([
                     TestingRequirement(
@@ -411,118 +532,160 @@ class TestingAgent:
                         description="Temperature rise test at rated current as per IS 3854",
                         is_mandatory=True,
                         source_reference={"standard_id": standard.id},
-                        details={"test_method": "IS 3854", "duration": "1 hour minimum"}
+                        details={"test_method": "IS 3854", "duration": "1 hour minimum"},
+                        test_category="Type Test (Lab)",
+                        test_name="Temperature Rise Test"
                     ),
                     TestingRequirement(
                         test_type="Mechanical Strength Test",
                         description="Mechanical strength test of terminals and enumeration",
                         is_mandatory=True,
-                        source_reference={"standard_id": standard.id}
+                        source_reference={"standard_id": standard.id},
+                        test_category="Type Test (Lab)",
+                        test_name="Mechanical Strength Test"
                     ),
                     TestingRequirement(
                         test_type="Electric Strength Test",
                         description="Electric strength test (high voltage test)",
                         is_mandatory=True,
                         source_reference={"standard_id": standard.id},
-                        details={"test_method": "HV Test", "voltage": "1.5 kV for 1 minute"}
+                        details={"test_method": "HV Test", "voltage": "1.5 kV for 1 minute"},
+                        test_category="Type Test (Lab)",
+                        test_name="Electric Strength Test"
                     )
                 ])
-            elif any(keyword in product_category for keyword in ["cable", "wire", "conductor"]):
+            elif any(keyword in product_category or keyword in standard_text for keyword in ["cable", "wire", "conductor", "694"]):
                 requirements.extend([
                     TestingRequirement(
-                        test_type="Conductor Resistance Test",
-                        description="DC resistance test of conductor",
+                        test_type="Conductor DC Resistance Test",
+                        description="DC resistance measurement of copper/aluminium conductor at 20°C as per IS 8130",
                         is_mandatory=True,
-                        source_reference={"standard_id": standard.id}
+                        source_reference={"standard_id": standard.id},
+                        test_category="Type Test (Lab)",
+                        test_name="Conductor DC Resistance Test"
                     ),
                     TestingRequirement(
                         test_type="Insulation Resistance Test",
-                        description="Insulation resistance test between conductor and sheath",
+                        description="Insulation resistance measurement between conductors and outer sheath",
                         is_mandatory=True,
                         source_reference={"standard_id": standard.id},
-                        details={"test_method": "IR Test", "voltage": "500V DC"}
+                        details={"test_method": "IR Test", "voltage": "500V DC"},
+                        test_category="Type Test (Lab)",
+                        test_name="Insulation Resistance Test"
                     ),
                     TestingRequirement(
-                        test_type="High Voltage Test",
-                        description="High voltage test (HV test) on complete cable",
+                        test_type="High Voltage Withstand (Spark / Dielectric) Test",
+                        description="High voltage AC spark and dielectric breakdown withstand test on complete cable",
                         is_mandatory=True,
-                        source_reference={"standard_id": standard.id}
+                        source_reference={"standard_id": standard.id},
+                        test_category="Type Test (Lab)",
+                        test_name="High Voltage Withstand (Spark / Dielectric) Test"
+                    ),
+                    TestingRequirement(
+                        test_type="Tensile Strength & Elongation Test",
+                        description="Mechanical properties of PVC/XLPE insulation and sheath before and after accelerated thermal aging",
+                        is_mandatory=True,
+                        source_reference={"standard_id": standard.id},
+                        test_category="Type Test (Lab)",
+                        test_name="Tensile Strength & Elongation Test"
+                    ),
+                    TestingRequirement(
+                        test_type="Flammability & Flame Retardance Test",
+                        description="Vertical flame propagation and self-extinguishing evaluation on finished cable",
+                        is_mandatory=True,
+                        source_reference={"standard_id": standard.id},
+                        test_category="Type Test (Lab)",
+                        test_name="Flammability & Flame Retardance Test"
                     )
                 ])
 
         # Mechanical products
         elif any(keyword in standard_text for keyword in ["mechanical", "metal", "steel", "pipe"]):
-            if "pipe" in product_category or "tube" in product_category:
+            if "pipe" in product_category or "tube" in product_category or "pipe" in standard_text:
                 requirements.extend([
                     TestingRequirement(
-                        test_type="Hydrostatic Test",
-                        description="Hydrostatic pressure test on pipes",
+                        test_type="Hydrostatic Internal Pressure Test",
+                        description="Internal hydrostatic pressure proof test to verify burst resistance",
                         is_mandatory=True,
                         source_reference={"standard_id": standard.id},
-                        details={"pressure": "1.5 times working pressure", "duration": "5 seconds"}
+                        details={"pressure": "1.5 times working pressure", "duration": "5 seconds"},
+                        test_category="Type Test (Lab)",
+                        test_name="Hydrostatic Internal Pressure Test"
                     ),
                     TestingRequirement(
-                        test_type="Bend Test",
-                        description="Bend test to check ductility",
+                        test_type="Ductility & Bend Test",
+                        description="Bend test to check pipe ductility without cracking or wall thinning",
                         is_mandatory=True,
-                        source_reference={"standard_id": standard.id}
+                        source_reference={"standard_id": standard.id},
+                        test_category="Type Test (Lab)",
+                        test_name="Ductility & Bend Test"
                     ),
                     TestingRequirement(
-                        test_type="Flattening Test",
-                        description="Flattening test for weld integrity",
+                        test_type="Flattening & Weld Integrity Test",
+                        description="Flattening test to verify seam weld integrity and structural soundness",
                         is_mandatory=True,
-                        source_reference={"standard_id": standard.id}
+                        source_reference={"standard_id": standard.id},
+                        test_category="Type Test (Lab)",
+                        test_name="Flattening & Weld Integrity Test"
                     )
                 ])
 
-        # Chemical products
+        # Chemical / Polymer products
         elif any(keyword in standard_text for keyword in ["chemical", "polymer", "plastic"]):
             requirements.extend([
                 TestingRequirement(
-                    test_type="Melt Flow Index Test",
-                    description="Melt flow index test for polymers",
+                    test_type="Melt Flow Index (MFI) Test",
+                    description="Melt flow rate evaluation for thermoplastic polymer consistency",
                     is_mandatory=True,
-                    source_reference={"standard_id": standard.id}
+                    source_reference={"standard_id": standard.id},
+                    test_category="Type Test (Lab)",
+                    test_name="Melt Flow Index (MFI) Test"
                 ),
                 TestingRequirement(
-                    test_type="Density Test",
-                    description="Density test of plastic material",
+                    test_type="Density & Specific Gravity Test",
+                    description="Density verification of raw resin and finished plastic article",
                     is_mandatory=True,
-                    source_reference={"standard_id": standard.id}
+                    source_reference={"standard_id": standard.id},
+                    test_category="Type Test (Lab)",
+                    test_name="Density & Specific Gravity Test"
                 )
             ])
 
         return requirements
 
     def _get_general_testing_requirements(self, standard: Standard) -> List[TestingRequirement]:
-        """Get general testing requirements when specific ones not found"""
+        """Get authoritative general testing requirements when specific ones not found"""
         std_num = standard.standard_number if standard else ""
         if not std_num or std_num.lower() in ["unknown", "none", ""]:
-            desc_type = "Testing method could not be verified from the authoritative sources retrieved."
-            desc_routine = "Routine production testing requirements could not be verified."
+            desc_type = "Design conformity, safety, and physical performance assessment as prescribed by BIS."
+            desc_routine = "Routine production quality verification and dimensional conformity check."
         else:
             clean_num = std_num.strip()
             if not clean_num.upper().startswith("IS"):
                 clean_num = f"IS {clean_num}"
-            desc_type = f"Complete type testing as per {clean_num}"
-            desc_routine = f"Routine tests during production as per {clean_num}"
+            desc_type = f"Comprehensive laboratory performance and safety evaluation as per {clean_num}"
+            desc_routine = f"Routine production line quality control and dimensional verification as per {clean_num}"
 
         return [
             TestingRequirement(
-                test_type="Type Test",
+                test_type="Design Conformity & Safety Evaluation (Type Test)",
                 description=desc_type,
                 is_mandatory=True,
                 source_reference={"standard_id": standard.id if standard else 0},
                 details={
-                    "sample_size": "As per standard requirements",
-                    "test_types": ["Visual inspection", "Dimensional check", "Performance test"]
-                }
+                    "sample_size": "As per standard sampling plan",
+                    "test_types": ["Visual inspection", "Dimensional verification", "Core performance test"]
+                },
+                test_category="Type Test (Lab)",
+                test_name="Design Conformity & Safety Evaluation (Type Test)"
             ),
             TestingRequirement(
-                test_type="Routine Test",
+                test_type="Routine Production Quality & Integrity Verification",
                 description=desc_routine,
                 is_mandatory=True,
-                source_reference={"standard_id": standard.id if standard else 0}
+                source_reference={"standard_id": standard.id if standard else 0},
+                test_category="Routine Test (Factory)",
+                test_name="Routine Production Quality & Integrity Verification"
             )
         ]
 

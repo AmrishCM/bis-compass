@@ -232,6 +232,7 @@ export const STATIC_TRANSLATIONS: Record<SupportedLanguage, Record<string, strin
 
 interface LanguageContextType {
   language: SupportedLanguage;
+  currentLanguage: SupportedLanguage;
   setLanguage: (lang: SupportedLanguage) => void;
   t: (key: string) => string;
   translateDynamic: (text: string) => Promise<string>;
@@ -239,6 +240,7 @@ interface LanguageContextType {
 
 const LanguageContext = createContext<LanguageContextType>({
   language: 'en',
+  currentLanguage: 'en',
   setLanguage: () => {},
   t: (key: string) => key,
   translateDynamic: async (text: string) => text
@@ -289,7 +291,7 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   };
 
   return (
-    <LanguageContext.Provider value={{ language, setLanguage, t, translateDynamic }}>
+    <LanguageContext.Provider value={{ language, currentLanguage: language, setLanguage, t, translateDynamic }}>
       {children}
     </LanguageContext.Provider>
   );

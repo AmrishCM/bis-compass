@@ -3,6 +3,7 @@ import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard,
   Sparkles,
+  ShieldCheck,
   BookOpen,
   FileCheck,
   Building2,
@@ -16,6 +17,7 @@ import {
 const NAV_ITEMS = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/analyze', label: 'Product Intelligence', icon: Sparkles, badge: 'Flagship' },
+  { to: '/consumer', label: 'Consumer & Hallmarking', icon: ShieldCheck, badge: 'New' },
   { to: '/standards', label: 'Standards Directory', icon: BookOpen },
   { to: '/compliance', label: 'Compliance Gap Analyzer', icon: FileCheck },
   { to: '/laboratories', label: 'Testing Laboratories', icon: Building2 },

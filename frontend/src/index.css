@@ -3,18 +3,56 @@
 @tailwind utilities;
 
 :root {
-  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-sans: 'Atkinson Hyperlegible', 'Inter', system-ui, '-apple-system', sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
+  --color-primary: #0F172A;
+  --color-secondary: #334155;
+  --color-accent: #0369A1;
+  --color-background: #F8FAFC;
+  --color-text-primary: #0F172A;
+  --color-text-secondary: #334155;
+  --color-text-muted: #64748B;
+  --color-neutral-50: #F8FAFC;
+  --color-neutral-100: #F1F5F9;
+  --color-neutral-200: #E2E8F0;
+  --color-neutral-300: #CBD5E1;
+  --color-neutral-400: #94A3B8;
+  --color-neutral-500: #64748B;
+  --color-neutral-600: #475569;
+  --color-neutral-700: #334155;
+  --color-neutral-800: #1E293B;
+  --color-neutral-900: #0F172A;
+}
+
+.dark {
+  --color-primary: #F8FAFC;
+  --color-secondary: #E2E8F0;
+  --color-accent: #60A5FA;
+  --color-background: #0F172A;
+  --color-text-primary: #F8FAFC;
+  --color-text-secondary: #E2E8F0;
+  --color-text-muted: #94A3B8;
+  --color-neutral-50: #1E293B;
+  --color-neutral-100: #334155;
+  --color-neutral-200: #475569;
+  --color-neutral-300: #64748B;
+  --color-neutral-400: #94A3B8;
+  --color-neutral-500: #BDC5D1;
+  --color-neutral-600: #E2E8F0;
+  --color-neutral-700: #F1F5F9;
+  --color-neutral-800: #F8FAFC;
+  --color-neutral-900: #FFFFFF;
 }
 
 body {
   margin: 0;
   padding: 0;
-  background-color: #f8fafc;
-  color: #0f172a;
+  background-color: var(--color-background);
+  color: var(--color-text-primary);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  transition: background-color 0.2s, color 0.2s; /* Smooth transition for dark mode */
 }
 
 /* Custom crisp scrollbars */
@@ -23,12 +61,93 @@ body {
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #f1f5f9;
+  background: var(--color-neutral-100);
 }
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: var(--color-neutral-300);
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: var(--color-neutral-400);
+}
+
+/* Dark mode scrollbars */
+.dark ::-webkit-scrollbar-track {
+  background: var(--color-neutral-800);
+}
+.dark ::-webkit-scrollbar-thumb {
+  background: var(--color-neutral-600);
+}
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: var(--color-neutral-500);
+}
+
+/* Skip link */
+.skip-link {
+  position: absolute;
+  top: -40px;
+  left: 0;
+  background-color: var(--color-primary);
+  color: var(--color-background);
+  padding: 8px 16px;
+  z-index: 10000;
+  transition: top 0.2s ease-in-out, background-color 0.2s, color 0.2s;
+  font-family: var(--font-sans);
+  font-size: 0.875rem;
+  text-decoration: none;
+}
+.skip-link:focus {
+  top: 0;
+}
+
+/* Focus visible outlines for accessibility */
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Ensure focus is visible in dark mode */
+.dark :focus-visible {
+  outline-color: var(--color-accent);
+}
+
+/* Minimum touch target size: 44px */
+button,
+input[type="button"],
+input[type="reset"],
+input[type="submit"],
+input[type="text"],
+input[type="password"],
+input[type="email"],
+input[type="tel"],
+input[type="url"],
+input[type="search"],
+input[type="date"],
+input[type="datetime-local"],
+input[type="month"],
+input[type="time"],
+input[type="week"],
+input[type="number"],
+input[type="color"],
+textarea,
+select,
+a[href],
+[role="button"],
+[tabindex]:not([tabindex="-1"]) {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* Ensure form elements have adequate touch target */
+input:not([type="checkbox"]):not([type="radio"]),
+textarea,
+select {
+  min-height: 44px;
+  padding: 0 12px;
+}
+button {
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0 16px;
 }

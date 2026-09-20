@@ -15,6 +15,8 @@ import {
 } from 'lucide-react';
 import { api } from '../services/api';
 
+import { GazetteUpdatesWidget } from '../components/GazetteUpdatesWidget';
+
 export const Dashboard: React.FC = () => {
   const navigate = useNavigate();
   const [stats, setStats] = useState<any>(null);
@@ -67,7 +69,7 @@ export const Dashboard: React.FC = () => {
       <div className="bg-gradient-to-r from-emerald-800 to-teal-900 rounded-xl p-6 text-white shadow-sm border border-emerald-700">
         <div className="max-w-3xl">
           <div className="inline-flex items-center space-x-1.5 bg-emerald-700/80 border border-emerald-500/50 rounded-full px-3 py-1 text-xs font-semibold mb-3">
-            <ShieldCheck className="h-3.5 w-3.5 text-emerald-300" />
+            <ShieldCheck className="h-3.5 w-3.5 text-emerald-300" aria-hidden="true" />
             <span>Ministry of Consumer Affairs & Bureau of Indian Standards Intelligence</span>
           </div>
           <h1 className="text-2xl font-extrabold tracking-tight text-white sm:text-3xl">
@@ -82,72 +84,72 @@ export const Dashboard: React.FC = () => {
           <div className="mt-5 flex flex-wrap gap-3">
             <button
               onClick={() => navigate('/analyze')}
-              className="bg-white text-emerald-900 hover:bg-emerald-50 text-xs font-bold px-4 py-2.5 rounded-lg shadow-sm flex items-center space-x-2 transition cursor-pointer"
+              className="flex items-center justify-center px-6 py-3.5 border border-transparent rounded-md shadow-sm text-base font-medium text-emerald-800 bg-emerald-50 hover:bg-emerald-100 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:opacity-50 transition-colors duration-200"
             >
-              <Sparkles className="h-4 w-4 text-emerald-700" />
+              <Sparkles className="w-4 h-4 mr-2" aria-hidden="true" />
               <span>Analyze a Product Now</span>
             </button>
             <button
               onClick={() => navigate('/standards')}
-              className="bg-emerald-700/60 hover:bg-emerald-700 text-white text-xs font-semibold px-4 py-2.5 rounded-lg border border-emerald-500/40 flex items-center space-x-1.5 transition cursor-pointer"
+              className="flex items-center justify-center px-6 py-3.5 border border-transparent rounded-md shadow-sm text-white font-medium bg-emerald-600 hover:bg-emerald-700 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:opacity-50 transition-colors duration-200"
             >
-              <BookOpen className="h-4 w-4" />
+              <BookOpen className="w-4 h-4 mr-2" aria-hidden="true" />
               <span>Browse Standards Catalog</span>
             </button>
           </div>
         </div>
       </div>
 
-      {/* Metrics Row */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-        <div className="bg-white p-3.5 rounded-lg border border-slate-200 shadow-2xs">
+      {/* Metrics Row - Single Column */}
+      <div className="space-y-4">
+        <div className="bg-white p-4 rounded-lg border border-slate-200 shadow-2xs">
           <span className="text-[11px] font-semibold text-slate-500 block">Standards Indexed</span>
           <div className="text-2xl font-black text-slate-900 mt-1">
-            {loading ? '-' : stats?.counts?.standards_indexed ?? 10}
+            {loading ? (
+              <div className="h-8 w-24 bg-slate-200 rounded animate-pulse" />
+            ) : (
+              stats?.counts?.standards_indexed ?? 10
+            )}
           </div>
           <span className="text-[10px] text-emerald-600 font-semibold flex items-center mt-1">
-            <CheckCircle2 className="h-3 w-3 mr-1" /> Active BIS Standards
+            <CheckCircle2 className="h-3 w-3 mr-1" aria-hidden="true" /> Active BIS Standards
           </span>
         </div>
 
-        <div className="bg-white p-3.5 rounded-lg border border-slate-200 shadow-2xs">
+        <div className="bg-white p-4 rounded-lg border border-slate-200 shadow-2xs">
           <span className="text-[11px] font-semibold text-slate-500 block">Verifiable Clauses</span>
           <div className="text-2xl font-black text-slate-900 mt-1">
-            {loading ? '-' : stats?.counts?.clauses_indexed ?? 40}
+            {loading ? (
+              <div className="h-8 w-24 bg-slate-200 rounded animate-pulse" />
+            ) : (
+              stats?.counts?.clauses_indexed ?? 40
+            )}
           </div>
           <span className="text-[10px] text-slate-500 mt-1 block">Clause-level evidence</span>
         </div>
 
-        <div className="bg-white p-3.5 rounded-lg border border-slate-200 shadow-2xs">
+        <div className="bg-white p-4 rounded-lg border border-slate-200 shadow-2xs">
           <span className="text-[11px] font-semibold text-slate-500 block">Certification Schemes</span>
           <div className="text-2xl font-black text-slate-900 mt-1">
-            {loading ? '-' : stats?.counts?.certification_schemes ?? 10}
+            {loading ? (
+              <div className="h-8 w-24 bg-slate-200 rounded animate-pulse" />
+            ) : (
+              stats?.counts?.certification_schemes ?? 10
+            )}
           </div>
           <span className="text-[10px] text-emerald-600 font-semibold mt-1 block">Scheme I & II (CRS)</span>
         </div>
 
-        <div className="bg-white p-3.5 rounded-lg border border-slate-200 shadow-2xs">
+        <div className="bg-white p-4 rounded-lg border border-slate-200 shadow-2xs">
           <span className="text-[11px] font-semibold text-slate-500 block">Accredited Labs</span>
           <div className="text-2xl font-black text-slate-900 mt-1">
-            {loading ? '-' : stats?.counts?.recognized_laboratories ?? 6}
+            {loading ? (
+              <div className="h-8 w-24 bg-slate-200 rounded animate-pulse" />
+            ) : (
+              stats?.counts?.recognized_laboratories ?? 6
+            )}
           </div>
           <span className="text-[10px] text-slate-500 mt-1 block">NABL & BIS Recognized</span>
-        </div>
-
-        <div className="bg-white p-3.5 rounded-lg border border-slate-200 shadow-2xs">
-          <span className="text-[11px] font-semibold text-slate-500 block">Official Sources</span>
-          <div className="text-2xl font-black text-slate-900 mt-1">
-            {loading ? '-' : stats?.counts?.authoritative_sources ?? 3}
-          </div>
-          <span className="text-[10px] text-emerald-600 font-semibold mt-1 block">Level 1 Authority</span>
-        </div>
-
-        <div className="bg-white p-3.5 rounded-lg border border-slate-200 shadow-2xs">
-          <span className="text-[11px] font-semibold text-slate-500 block">Analyses Performed</span>
-          <div className="text-2xl font-black text-slate-900 mt-1">
-            {loading ? '-' : stats?.counts?.analyses_performed ?? 0}
-          </div>
-          <span className="text-[10px] text-slate-500 mt-1 block">Audited query records</span>
         </div>
       </div>
 
@@ -164,7 +166,7 @@ export const Dashboard: React.FC = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3">
           {SAMPLE_PRODUCTS.map((prod, idx) => (
             <div
               key={idx}
@@ -199,8 +201,11 @@ export const Dashboard: React.FC = () => {
         </div>
       </div>
 
+      {/* Real-Time Gazette & Standards Update Pipeline */}
+      <GazetteUpdatesWidget />
+
       {/* System Integrity & Pipeline Transparency */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 gap-4">
         <div className="bg-white p-4 rounded-lg border border-slate-200">
           <div className="flex items-center space-x-2 text-slate-900 font-bold text-xs uppercase tracking-wider mb-2">
             <Database className="h-4 w-4 text-emerald-600" />

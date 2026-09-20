@@ -104,8 +104,23 @@ def init_db():
                     conn.execute(text("ALTER TABLE laboratories ADD COLUMN source_url VARCHAR(1000)"))
                 if "verified_date" not in lab_cols:
                     conn.execute(text("ALTER TABLE laboratories ADD COLUMN verified_date DATETIME"))
+                if "latitude" not in lab_cols:
+                    conn.execute(text("ALTER TABLE laboratories ADD COLUMN latitude FLOAT"))
+                if "longitude" not in lab_cols:
+                    conn.execute(text("ALTER TABLE laboratories ADD COLUMN longitude FLOAT"))
                 conn.commit()
     except Exception as e:
         logger.warning(f"Schema auto-migration notice: {e}")
+
+    # Ensure QCO database records are populated
+    try:
+        from app.api.routes.updates import ensure_qco_database_records
+        db = SessionLocal()
+        try:
+            ensure_qco_database_records(db)
+        finally:
+            db.close()
+    except Exception as e:
+        logger.warning(f"QCO records initialization notice: {e}")
 
     logger.info("Database tables verified/created.")

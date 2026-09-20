@@ -55,7 +55,17 @@ interface StandardDetailData {
   } | null;
   clauses: ClauseItem[];
   schemes: SchemeItem[];
+  related_dependencies?: Array<{
+    standard_number: string;
+    title: string;
+    relationship_type: string;
+    role?: string;
+    source_url?: string;
+  }>;
 }
+
+import { StandardsDependencyTree } from '../components/StandardsDependencyTree';
+import { GitBranch } from 'lucide-react';
 
 export const StandardDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -64,7 +74,7 @@ export const StandardDetail: React.FC = () => {
   const [standard, setStandard] = useState<StandardDetailData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'clauses' | 'schemes' | 'source'>('clauses');
+  const [activeTab, setActiveTab] = useState<'clauses' | 'schemes' | 'source' | 'dependencies'>('clauses');
   const [clauseSearch, setClauseSearch] = useState('');
 
   useEffect(() => {
@@ -220,6 +230,16 @@ export const StandardDetail: React.FC = () => {
           Certification Schemes ({standard.schemes.length})
         </button>
         <button
+          onClick={() => setActiveTab('dependencies')}
+          className={`pb-3 transition-colors border-b-2 ${
+            activeTab === 'dependencies'
+              ? 'border-emerald-700 text-emerald-800'
+              : 'border-transparent text-slate-500 hover:text-slate-800'
+          }`}
+        >
+          Dependency & Related Standards ({(standard.related_dependencies || []).length})
+        </button>
+        <button
           onClick={() => setActiveTab('source')}
           className={`pb-3 transition-colors border-b-2 ${
             activeTab === 'source'
@@ -333,6 +353,17 @@ export const StandardDetail: React.FC = () => {
             </div>
           ))}
         </div>
+      )}
+
+      {activeTab === 'dependencies' && (
+        <StandardsDependencyTree
+          primaryStandard={{
+            standard_number: standard.standard_number,
+            title: standard.title,
+            status: standard.status,
+          }}
+          dependencies={standard.related_dependencies || []}
+        />
       )}
 
       {activeTab === 'source' && (

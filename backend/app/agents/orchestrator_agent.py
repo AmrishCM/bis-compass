@@ -5,9 +5,12 @@ import asyncio
 import time
 import uuid
 import json
+from pydantic import BaseModel
 
 from app.services.products.product_understanding import ProductUnderstandingEngine, get_product_understanding_engine, ProductUnderstanding
 from app.services.products.open_world_analyzer import OpenWorldProductAnalyzer
+from app.services.llm.provider_factory import LLMProviderFactory
+from app.core.llm_provider import LLMProvider
 from app.services.research.research_planner import ComplianceResearchPlanner, ComplianceResearchPlan
 from app.services.research.web_research_engine import WebResearchEngine, RetrievedEvidence
 from app.services.research.standard_discovery import StandardDiscoveryEngine, get_standard_discovery_engine, DiscoveredStandardEntity
@@ -24,6 +27,10 @@ from app.db.session import SessionLocal
 from app.core.exceptions import AIServiceUnavailableException
 import os
 
+from app.services.products.product_profile import ProductProfile, ClarificationQuestionItem, MultiProductDetection
+from app.services.research.scope_differentiator import ScopeDifferentiator
+from app.services.compliance.humanized_roadmap import HumanizedRoadmapBuilder
+
 logger = logging.getLogger(__name__)
 
 @dataclass
@@ -31,11 +38,29 @@ class OrchestrationInput:
     """Input for the orchestration workflow"""
     product_description: Optional[str] = None
     product_understanding: Optional[ProductUnderstanding] = None
+    product_profile: Optional[Dict[str, Any]] = None
+    previous_questions: Optional[List[str]] = None
     document_text: Optional[str] = None
     target_standard_ids: Optional[List[int]] = None
     location: Optional[str] = None
     include_web_search: bool = True
     max_results_per_agent: int = 5
+
+class SynthesisResult(BaseModel):
+    """Result of LLM-based synthesis"""
+    overall_assessment: str
+    recommendations: List[str]
+
+class CanonicalDecision(BaseModel):
+    """Canonical decision object"""
+    decision: Dict[str, Any]
+    product: Dict[str, Any]
+    standards: List[Dict[str, Any]]
+    regulatory: Dict[str, Any]
+    testing: List[Dict[str, Any]]
+    laboratories: List[Dict[str, Any]]
+    clarifications: List[str]
+    audit: Dict[str, Any]
 
 @dataclass
 class OrchestrationResult:
@@ -51,6 +76,11 @@ class OrchestrationResult:
     web_search_results: List[WebSearchResult] = field(default_factory=list)
     clarification_required: bool = False
     clarification_questions: List[str] = field(default_factory=list)
+    clarification_question_items: List[Dict[str, Any]] = field(default_factory=list)
+    final_status: str = "READY"
+    product_profile: Optional[Dict[str, Any]] = None
+    step_by_step_roadmap: Dict[str, Any] = field(default_factory=dict)
+    multi_product_detected: Optional[Dict[str, Any]] = None
     potential_standards: List[StandardMatch] = field(default_factory=list)
     related_standards: List[Dict[str, Any]] = field(default_factory=list)
     rejected_candidates: List[Dict[str, Any]] = field(default_factory=list)
@@ -71,8 +101,18 @@ class OrchestratorAgent:
     """Agent responsible for coordinating multi-agent workflows for BIS certification analysis"""
 
     def __init__(self):
-        self.product_understanding_engine = get_product_understanding_engine()
+        # Initialize resilient dual LLM providers (NVIDIA + Groq failover)
+        self.nvidia_provider = LLMProviderFactory.create_provider(provider_type="nvidia")
+        self.groq_provider = LLMProviderFactory.create_provider(provider_type="groq")
+        self.dual_provider = LLMProviderFactory.create_provider(provider_type="dual")
+        self.scope_differentiator = ScopeDifferentiator()
+
+        # Initialize analyzers with resilient provider
         self.open_world_analyzer = OpenWorldProductAnalyzer()
+        self.open_world_analyzer.llm_provider = self.dual_provider
+
+        # Keep NVIDIA provider for accuracy-critical tasks
+        self.product_understanding_engine = get_product_understanding_engine()
         self.research_planner = ComplianceResearchPlanner()
         self.web_research_engine = WebResearchEngine()
         self.standard_discovery = get_standard_discovery_engine()
@@ -128,9 +168,76 @@ class OrchestratorAgent:
                 result.product_understanding = input_data.product_understanding
             result.agent_execution_times['product_understanding'] = time.time() - pu_start
 
+            # Multi-Product Detection (Section 29)
+            if result.product_understanding and result.product_understanding.multi_product_detected:
+                mp = result.product_understanding.multi_product_detected
+                if mp.get("is_multi_product"):
+                    result.clarification_required = True
+                    result.final_status = "NEEDS_CLARIFICATION"
+                    result.multi_product_detected = mp
+                    msg = mp.get("message", "Multiple distinct products detected.")
+                    result.clarification_questions = [msg]
+                    result.clarification_question_items = [
+                        {
+                            "id": "q_multi_product",
+                            "question": "Which product would you like to check compliance for first?",
+                            "why_needed": "Each distinct product category falls under different BIS standards, Quality Control Orders, and testing schemes.",
+                            "options": mp.get("detected_products", []),
+                            "affects": ["standard_selection"],
+                            "attribute_key": "selected_product"
+                        }
+                    ]
+                    result.overall_assessment = msg
+                    result.recommendations = mp.get("detected_products", [])
+                    self._finalize_result(result, start_time)
+                    self._save_research_session(result, input_data.product_description or "")
+                    return result
+
+            # Structured ProductProfile extraction
+            if input_data.product_profile:
+                prod_profile = ProductProfile(**input_data.product_profile)
+            elif result.product_understanding and result.product_understanding.product_profile:
+                prod_profile = ProductProfile(**result.product_understanding.product_profile)
+            elif result.product_understanding:
+                pu = result.product_understanding
+                prod_profile = ProductProfile(
+                    product_name=pu.product_name,
+                    material=", ".join(pu.materials) if pu.materials else None,
+                    intended_use=pu.intended_use
+                )
+            else:
+                prod_profile = ProductProfile(product_name="Product")
+
+            # Extract confirmed physical and operational attributes from description & understanding
+            desc_lower = f"{input_data.product_description or ''} {getattr(result.product_understanding, 'product_name', '')} {getattr(result.product_understanding, 'application', '')}".lower()
+            if any(k in desc_lower for k in ["vacuum", "insulated", "thermo", "flask"]):
+                prod_profile.insulation = "Vacuum / Thermal Insulated"
+                prod_profile.unknown_attributes = [u for u in prod_profile.unknown_attributes if u.lower() not in ["insulation", "thermal"]]
+            elif any(k in desc_lower for k in ["single wall", "single-wall", "non-insulated"]):
+                prod_profile.insulation = "Single-wall (Non-insulated)"
+                prod_profile.unknown_attributes = [u for u in prod_profile.unknown_attributes if u.lower() not in ["insulation", "thermal"]]
+
+            if any(k in desc_lower for k in ["double wall", "double-wall"]):
+                prod_profile.construction = "Double-wall"
+                prod_profile.unknown_attributes = [u for u in prod_profile.unknown_attributes if u.lower() not in ["construction"]]
+            elif any(k in desc_lower for k in ["single wall", "single-wall"]):
+                prod_profile.construction = "Single-wall"
+                prod_profile.unknown_attributes = [u for u in prod_profile.unknown_attributes if u.lower() not in ["construction"]]
+
+            if any(k in desc_lower for k in ["domestic", "drinking", "household", "consumer", "potable"]):
+                if not prod_profile.intended_use:
+                    prod_profile.intended_use = "Domestic Drinking / Potable"
+                prod_profile.operating_environment = "Domestic"
+                prod_profile.unknown_attributes = [u for u in prod_profile.unknown_attributes if u.lower() not in ["intended_use", "operating_environment", "intended use"]]
+
+            if input_data.location:
+                prod_profile.location = input_data.location
+            result.product_profile = prod_profile.dict()
+
             # If product understanding indicates clarification is required, safely abstain
             if result.product_understanding and result.product_understanding.clarification_required:
                 result.clarification_required = True
+                result.final_status = "NEEDS_CLARIFICATION"
                 result.clarification_questions = result.product_understanding.clarification_questions
                 result.overall_assessment = (
                     "Clarification required: The product description is ambiguous or specifies only a raw material "
@@ -343,6 +450,82 @@ class OrchestratorAgent:
                 "description": f"Verified {len(result.applicable_standards)} directly applicable; identified {len(result.potential_standards)} potentially relevant; excluded {len(result.rejected_candidates)} false positives."
             })
 
+            # Stage 4 Decision-Critical Unknowns Gate (Sections 2, 4, 5, 25)
+            # Demote any candidate standard from applicable to potential if its scope demands an attribute
+            # that is currently unknown in prod_profile.
+            demoted_to_potential = []
+            kept_applicable = []
+            for m in result.applicable_standards:
+                m_text = f"{m.standard_number} {m.title} {m.metadata.get('scope', '')}".lower()
+                needs_unknown = False
+
+                if "insulation" in prod_profile.unknown_attributes:
+                    if any(k in m_text for k in ["vacuum", "insulated", "flask"]):
+                        needs_unknown = True
+                if "voltage_range" in prod_profile.unknown_attributes or "voltage" in prod_profile.unknown_attributes:
+                    if any(k in m_text for k in ["voltage", "1100", "kv"]):
+                        needs_unknown = True
+                if "fabric_construction" in prod_profile.unknown_attributes:
+                    if any(k in m_text for k in ["knitted", "woven"]):
+                        needs_unknown = True
+                if "construction" in prod_profile.unknown_attributes:
+                    if any(k in m_text for k in ["double wall", "double-wall", "vacuum"]):
+                        needs_unknown = True
+
+                if needs_unknown:
+                    m.status = "NEEDS_CLARIFICATION"
+                    demoted_to_potential.append(m)
+                else:
+                    kept_applicable.append(m)
+
+            result.applicable_standards = kept_applicable
+            result.potential_standards.extend(demoted_to_potential)
+
+            # If there are NO applicable standards, but there ARE potential standards,
+            # evaluate if clarification is truly required or if top candidate can be confirmed.
+            if not result.applicable_standards and result.potential_standards:
+                has_previous_answers = bool(input_data.previous_questions and len(input_data.previous_questions) > 0)
+                best_candidate = result.potential_standards[0] if result.potential_standards else None
+
+                # If user already answered clarifications or top candidate has high applicability score, promote to applicable
+                if has_previous_answers or (best_candidate and getattr(best_candidate, 'applicability_score', 0) >= 35):
+                    best_candidate.status = "APPLICABLE"
+                    result.applicable_standards = [best_candidate]
+                    result.potential_standards = result.potential_standards[1:]
+                    logger.info(f"Promoted top candidate standard {best_candidate.standard_number} to applicable.")
+                else:
+                    # Genuinely ambiguous candidate standards with no previous answers -> prompt clarification
+                    all_candidates_for_diff = [
+                        {
+                            "standard_number": s.standard_number,
+                            "title": s.title,
+                            "scope": s.metadata.get("scope") or s.metadata.get("evidence_snippet", "")
+                        }
+                        for s in result.potential_standards
+                    ]
+
+                    dynamic_questions = await self.scope_differentiator.differentiate_and_generate_questions(
+                        product_profile=prod_profile,
+                        candidate_standards=all_candidates_for_diff,
+                        previous_questions=input_data.previous_questions or [],
+                        product_description=input_data.product_description or ""
+                    )
+
+                    if dynamic_questions:
+                        result.clarification_required = True
+                        result.final_status = "NEEDS_CLARIFICATION"
+                        result.product_profile = prod_profile.dict()
+                        result.clarification_questions = [q.question for q in dynamic_questions]
+                        result.clarification_question_items = [q.dict() for q in dynamic_questions]
+                        result.overall_assessment = (
+                            "We found more than one possible BIS requirement. "
+                            "Before giving you a certification answer, we need a few details to make sure we identify the correct product category."
+                        )
+                        result.recommendations = [q.question for q in dynamic_questions]
+                        self._finalize_result(result, start_time)
+                        self._save_research_session(result, input_data.product_description or "")
+                        return result
+
             # Check if any applicable or potential standards found
             if not result.applicable_standards and not result.potential_standards:
                 result.overall_assessment = (
@@ -357,23 +540,6 @@ class OrchestratorAgent:
                 self._finalize_result(result, start_time)
                 self._save_research_session(result, input_data.product_description or "")
                 return result
-
-            if not result.applicable_standards and result.potential_standards:
-                pot = result.potential_standards[0]
-                result.clarification_required = True
-                result.clarification_questions = pot.metadata.get("clarification_questions", []) or [
-                    "Please confirm whether your product matches all specific construction and category parameters of this standard."
-                ]
-                result.overall_assessment = (
-                    f"Potentially applicable official Indian Standard identified: {pot.standard_number} "
-                    f"({pot.title}). Product identity matches standard domain, but specific construction, "
-                    f"intended demographic, or classification parameters must be confirmed to establish mandatory statutory compliance."
-                )
-                result.recommendations = [
-                    f"Review official Indian Standard {pot.standard_number}: {pot.title}.",
-                    "Confirm whether your specific product parameters meet the defined scope boundaries.",
-                    "Mandatory certification status: Voluntary Indian Standard unless specifically notified under a Central Quality Control Order (QCO)."
-                ]
 
             # Step 3: Process each standard (in parallel for efficiency)
             std_process_start = time.time()
@@ -420,68 +586,111 @@ class OrchestratorAgent:
                         )
                     )
 
-            # Execute all tasks in parallel
-            if certification_tasks:
-                cert_results = await asyncio.gather(*certification_tasks, return_exceptions=True)
-                for i, res in enumerate(cert_results):
-                    if not isinstance(res, Exception):
-                        result.certification_info.append(res)
-                    else:
-                        logger.warning(f"Certification task {i} failed: {res}")
+            # Execute all tasks in parallel concurrently (unified latency optimization)
+            async def run_certification_batch():
+                if not certification_tasks:
+                    return []
+                return await asyncio.gather(*certification_tasks, return_exceptions=True)
 
-            if testing_tasks:
-                test_results = await asyncio.gather(*testing_tasks, return_exceptions=True)
-                for i, res in enumerate(test_results):
-                    if not isinstance(res, Exception):
-                        result.testing_information.append(res)
-                    else:
-                        logger.warning(f"Testing task {i} failed: {res}")
+            async def run_testing_batch():
+                if not testing_tasks:
+                    return []
+                return await asyncio.gather(*testing_tasks, return_exceptions=True)
 
-            if lab_tasks:
-                lab_results = await asyncio.gather(*lab_tasks, return_exceptions=True)
-                for i, res in enumerate(lab_results):
-                    if not isinstance(res, Exception):
-                        result.laboratory_recommendations.extend(res)
-                    else:
-                        logger.warning(f"Laboratory task {i} failed: {res}")
+            async def run_lab_batch():
+                if not lab_tasks:
+                    return []
+                return await asyncio.gather(*lab_tasks, return_exceptions=True)
 
-            if compliance_tasks:
-                comp_results = await asyncio.gather(*compliance_tasks, return_exceptions=True)
-                for i, res in enumerate(comp_results):
-                    if not isinstance(res, Exception):
-                        result.compliance_analysis.append(res)
-                    else:
-                        logger.warning(f"Compliance task {i} failed: {res}")
+            async def run_compliance_batch():
+                if not compliance_tasks:
+                    return []
+                return await asyncio.gather(*compliance_tasks, return_exceptions=True)
 
-            if citation_tasks:
-                cite_results = await asyncio.gather(*citation_tasks, return_exceptions=True)
-                for i, res in enumerate(cite_results):
-                    if not isinstance(res, Exception):
-                        result.citation_verification.extend(res)
-                    else:
-                        logger.warning(f"Citation task {i} failed: {res}")
+            async def run_citation_batch():
+                if not citation_tasks:
+                    return []
+                return await asyncio.gather(*citation_tasks, return_exceptions=True)
 
-            result.agent_execution_times['standard_processing'] = time.time() - std_process_start
-
-            # Step 4: Optional web search for additional information
-            if input_data.include_web_search and result.product_understanding:
-                web_start = time.time()
-                logger.info("Step 4: Web search for additional information")
+            async def run_web_search_batch():
+                if not (input_data.include_web_search and result.product_understanding):
+                    return []
                 try:
-                    web_results = await self._perform_web_search(
+                    return await self._perform_web_search(
                         result.product_understanding, result.applicable_standards[:3]
                     )
-                    result.web_search_results = web_results
                 except Exception as e:
                     logger.warning(f"Web search failed: {e}")
-                result.agent_execution_times['web_search'] = time.time() - web_start
+                    return []
+
+            batch_results = await asyncio.gather(
+                run_certification_batch(),
+                run_testing_batch(),
+                run_lab_batch(),
+                run_compliance_batch(),
+                run_citation_batch(),
+                run_web_search_batch(),
+                return_exceptions=True
+            )
+
+            cert_results = batch_results[0] if not isinstance(batch_results[0], Exception) else []
+            test_results = batch_results[1] if not isinstance(batch_results[1], Exception) else []
+            lab_results = batch_results[2] if not isinstance(batch_results[2], Exception) else []
+            comp_results = batch_results[3] if not isinstance(batch_results[3], Exception) else []
+            cite_results = batch_results[4] if not isinstance(batch_results[4], Exception) else []
+            web_results = batch_results[5] if not isinstance(batch_results[5], Exception) else []
+
+            for i, res in enumerate(cert_results):
+                if not isinstance(res, Exception):
+                    result.certification_info.append(res)
+                else:
+                    logger.warning(f"Certification task {i} failed: {res}")
+
+            for i, res in enumerate(test_results):
+                if not isinstance(res, Exception):
+                    result.testing_information.append(res)
+                else:
+                    logger.warning(f"Testing task {i} failed: {res}")
+
+            for i, res in enumerate(lab_results):
+                if not isinstance(res, Exception):
+                    result.laboratory_recommendations.extend(res)
+                else:
+                    logger.warning(f"Laboratory task {i} failed: {res}")
+
+            for i, res in enumerate(comp_results):
+                if not isinstance(res, Exception):
+                    result.compliance_analysis.append(res)
+                else:
+                    logger.warning(f"Compliance task {i} failed: {res}")
+
+            for i, res in enumerate(cite_results):
+                if not isinstance(res, Exception):
+                    result.citation_verification.extend(res)
+                else:
+                    logger.warning(f"Citation task {i} failed: {res}")
+
+            result.web_search_results = web_results
+            result.agent_execution_times['standard_processing'] = time.time() - std_process_start
 
             # Step 5: Synthesize results and generate recommendations
             synth_start = time.time()
-            logger.info("Step 5: Synthesizing results")
-            result.overall_assessment, result.recommendations = self._synthesize_results(result)
+            result.overall_assessment, result.recommendations = await self._synthesize_results(result)
             result.what_you_need_to_do = self._generate_what_you_need_to_do(result)
             result.canonical_decision = self._generate_canonical_decision(result)
+
+            # Build humanized 8-step roadmap
+            result.step_by_step_roadmap = HumanizedRoadmapBuilder.build_roadmap(
+                product_profile=prod_profile,
+                applicable_standards=result.applicable_standards,
+                potential_standards=result.potential_standards,
+                certification_info=result.certification_info,
+                testing_information=result.testing_information,
+                laboratories=result.laboratory_recommendations,
+                location=input_data.location or prod_profile.location
+            )
+            result.product_profile = prod_profile.dict()
+            result.final_status = "PRODUCT_IDENTIFIED" if result.applicable_standards else ("NEEDS_CLARIFICATION" if result.clarification_required else "NO_VERIFIED_STANDARD_FOUND")
             result.agent_execution_times['synthesis'] = time.time() - synth_start
 
             result.research_stages.append({
@@ -718,8 +927,17 @@ class OrchestratorAgent:
         summary['include_web_search'] = input_data.include_web_search
         return summary
 
-    def _synthesize_results(self, result: OrchestrationResult) -> Tuple[str, List[str]]:
+    async def _synthesize_results(self, result: OrchestrationResult) -> Tuple[str, List[str]]:
         """Synthesize all results into an overall assessment and recommendations"""
+        # Use NVIDIA provider for accuracy-critical synthesis
+        try:
+            return await self._synthesize_results_with_llm(result)
+        except Exception as e:
+            logger.warning(f"LLM synthesis failed, falling back to rule-based synthesis: {e}")
+            return self._synthesize_results_rule_based(result)
+
+    def _synthesize_results_rule_based(self, result: OrchestrationResult) -> Tuple[str, List[str]]:
+        """Rule-based synthesis of results into an overall assessment and recommendations"""
         assessment_parts = []
         recommendations = []
 
@@ -850,6 +1068,75 @@ class OrchestratorAgent:
                 unique_recommendations.append(rec)
 
         return overall_assessment, unique_recommendations[:8]  # Limit to top 8 recommendations
+
+    async def _synthesize_results_with_llm(self, result: OrchestrationResult) -> Tuple[str, List[str]]:
+        """LLM-enhanced synthesis of results into an overall assessment and recommendations"""
+        # Prepare a summary of the results for the LLM
+        summary = {
+            "product_understanding": {
+                "product_name": result.product_understanding.product_name if result.product_understanding else None,
+                "category": result.product_understanding.category if result.product_understanding else None,
+                "intended_use": result.product_understanding.intended_use if result.product_understanding else None,
+                "confidence": result.product_understanding.confidence if result.product_understanding else None
+            } if result.product_understanding else None,
+            "applicable_standards_count": len(result.applicable_standards),
+            "applicable_standards": [{"standard_number": s.standard_number, "title": s.title} for s in result.applicable_standards[:5]],
+            "certification_info_count": len(result.certification_info),
+            "licensing_required_count": sum(1 for c in result.certification_info if c.license_required) if result.certification_info else 0,
+            "testing_info_count": len(result.testing_information),
+            "laboratory_recommendations_count": len(result.laboratory_recommendations),
+            "bis_recognized_labs_count": sum(1 for l in result.laboratory_recommendations if l.is_bis_recognized) if result.laboratory_recommendations else 0,
+            "compliance_analysis_count": len(result.compliance_analysis),
+            "avg_compliance": sum(c.compliance_percentage for c in result.compliance_analysis) / len(result.compliance_analysis) if result.compliance_analysis else 0,
+            "citation_verification_count": len(result.citation_verification),
+            "verified_citations_count": sum(1 for v in result.citation_verification if v.is_verified) if result.citation_verification else 0,
+            "avg_citation_confidence": sum(v.confidence for v in result.citation_verification) / len(result.citation_verification) if result.citation_verification else 0,
+            "web_search_results_count": len(result.web_search_results)
+        }
+
+        system_prompt = """You are an expert BIS compliance analyst. Your task is to synthesize the results of a product compliance analysis into a clear overall assessment and actionable recommendations.
+
+Based on the provided analysis data, generate:
+1. A concise overall assessment (1-2 sentences) summarizing the key findings
+2. A list of specific, actionable recommendations (maximum 8)
+
+Focus on:
+- The product identity and its regulatory implications
+- Standards applicability and compliance status
+- Certification, testing, and laboratory requirements
+- Any gaps or issues that need attention
+- Next steps for the manufacturer
+
+Be clear, professional, and helpful. Base your response solely on the provided data."""
+
+        user_prompt = f"""Please synthesize the following BIS compliance analysis results:
+
+{json.dumps(summary, indent=2)}
+
+Provide your response in JSON format with exactly these two fields:
+{{
+  "overall_assessment": "your overall assessment here",
+  "recommendations": ["recommendation 1", "recommendation 2", ...]
+}}"""
+
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt}
+        ]
+
+        # Use NVIDIA provider for accuracy-critical synthesis
+        response = await self.nvidia_provider.structured_output(
+            messages=messages,
+            response_model=SynthesisResult,
+            temperature=0.2,
+            max_tokens=1000
+        )
+
+        if response and response.data:
+            return response.data.overall_assessment, response.data.recommendations
+        else:
+            # Fallback to rule-based if LLM fails to produce valid structured output
+            return self._synthesize_results_rule_based(result)
 
     def _synthesize_standards_only(self, result: OrchestrationResult) -> Tuple[str, List[str]]:
         """Synthesize results for standards-only analysis"""
@@ -1059,6 +1346,10 @@ class OrchestratorAgent:
         Section 8.12: Canonical Decision Object
         Every analysis must terminate in exactly one canonical decision object.
         """
+        return self._generate_canonical_decision_rule_based(result)
+
+    def _generate_canonical_decision_rule_based(self, result: OrchestrationResult) -> Dict[str, Any]:
+        """Rule-based canonical decision generation"""
         top_std = result.applicable_standards[0] if result.applicable_standards else None
         c_info = next((c for c in result.certification_info if top_std and (c.standard_number == top_std.standard_number or c.standard_id == top_std.standard_id)), None)
 
@@ -1157,7 +1448,7 @@ class OrchestratorAgent:
             }
         }
 
-# Global agent instance
+
 _orchestrator_agent: Optional[OrchestratorAgent] = None
 
 

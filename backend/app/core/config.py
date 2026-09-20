@@ -18,6 +18,12 @@ class Settings(BaseSettings):
     NVIDIA_EMBED_MODEL: str = "nvidia/nemotron-3-embed-1b"
     NVIDIA_FALLBACK_CHAT_MODEL: str = "mistralai/mistral-nemotron"
 
+    # Groq API settings
+    GROQ_API_KEY: str = ""
+    GROQ_BASE_URL: str = "https://api.groq.com/openai/v1"
+    GROQ_CHAT_MODEL: str = "llama-3.3-70b-versatile"
+    GROQ_FALLBACK_CHAT_MODEL: str = "mixtral-8x7b-32768"
+
     # Security settings
     DEBUG: bool = True
     SECRET_KEY: str = "your-secret-key-here"

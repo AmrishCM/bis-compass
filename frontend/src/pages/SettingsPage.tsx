@@ -95,7 +95,7 @@ export const SettingsPage: React.FC = () => {
 
       {savedToast && (
         <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-xs font-semibold text-emerald-800 flex items-center space-x-2">
-          <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+          <CheckCircle2 className="w-4 h-4 text-emerald-600" aria-hidden="true" />
           <span>Configuration saved successfully. Weights applied to RAG orchestrator.</span>
         </div>
       )}
@@ -104,7 +104,7 @@ export const SettingsPage: React.FC = () => {
       <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm space-y-4">
         <div className="flex items-center justify-between border-b border-slate-100 pb-3">
           <div className="flex items-center space-x-2">
-            <Sliders className="w-4 h-4 text-emerald-700" />
+            <Sliders className="w-4 h-4 text-emerald-700" aria-hidden="true" />
             <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
               Hybrid Search RRF Formula Tuning (Prompt Principle #6)
             </h2>
@@ -123,66 +123,70 @@ export const SettingsPage: React.FC = () => {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pt-2">
           <div>
-            <div className="flex justify-between text-xs font-medium text-slate-700 mb-1">
+            <label htmlFor="semantic-weight" className="flex justify-between text-xs font-medium text-slate-700 mb-1">
               <span>Semantic Vector Weight (Dense)</span>
               <span className="font-bold text-emerald-700">{semanticWeight}</span>
-            </div>
+            </label>
             <input
+              id="semantic-weight"
               type="range"
               min="0"
               max="1"
               step="0.05"
               value={semanticWeight}
               onChange={(e) => setSemanticWeight(parseFloat(e.target.value))}
-              className="w-full accent-emerald-600 cursor-pointer"
+              className="w-full accent-emerald-600 cursor-pointer focus-visible:outline-none focus:ring-2 focus:ring-emerald-600"
             />
           </div>
 
           <div>
-            <div className="flex justify-between text-xs font-medium text-slate-700 mb-1">
+            <label htmlFor="lexical-weight" className="flex justify-between text-xs font-medium text-slate-700 mb-1">
               <span>Lexical / BM25 Weight (Sparse)</span>
               <span className="font-bold text-emerald-700">{lexicalWeight}</span>
-            </div>
+            </label>
             <input
+              id="lexical-weight"
               type="range"
               min="0"
               max="1"
               step="0.05"
               value={lexicalWeight}
               onChange={(e) => setLexicalWeight(parseFloat(e.target.value))}
-              className="w-full accent-emerald-600 cursor-pointer"
+              className="w-full accent-emerald-600 cursor-pointer focus-visible:outline-none focus:ring-2 focus:ring-emerald-600"
             />
           </div>
 
           <div>
-            <div className="flex justify-between text-xs font-medium text-slate-700 mb-1">
+            <label htmlFor="metadata-weight" className="flex justify-between text-xs font-medium text-slate-700 mb-1">
               <span>Metadata & Category Match Weight</span>
               <span className="font-bold text-emerald-700">{metadataWeight}</span>
-            </div>
+            </label>
             <input
+              id="metadata-weight"
               type="range"
               min="0"
               max="1"
               step="0.05"
               value={metadataWeight}
               onChange={(e) => setMetadataWeight(parseFloat(e.target.value))}
-              className="w-full accent-emerald-600 cursor-pointer"
+              className="w-full accent-emerald-600 cursor-pointer focus-visible:outline-none focus:ring-2 focus:ring-emerald-600"
             />
           </div>
 
           <div>
-            <div className="flex justify-between text-xs font-medium text-slate-700 mb-1">
+            <label htmlFor="authority-weight" className="flex justify-between text-xs font-medium text-slate-700 mb-1">
               <span>Source Authority Priority Weight</span>
               <span className="font-bold text-emerald-700">{authorityWeight}</span>
-            </div>
+            </label>
             <input
+              id="authority-weight"
               type="range"
               min="0"
               max="1"
               step="0.05"
               value={authorityWeight}
               onChange={(e) => setAuthorityWeight(parseFloat(e.target.value))}
-              className="w-full accent-emerald-600 cursor-pointer"
+              className="w-full accent-emerald-600 cursor-pointer focus-visible:outline-none focus:ring-2 focus:ring-emerald-600"
             />
           </div>
         </div>
@@ -191,7 +195,7 @@ export const SettingsPage: React.FC = () => {
       {/* NVIDIA NIM Model Parameters */}
       <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm space-y-4">
         <div className="flex items-center space-x-2 border-b border-slate-100 pb-3">
-          <Cpu className="w-4 h-4 text-emerald-700" />
+          <Cpu className="w-4 h-4 text-emerald-700" aria-hidden="true" />
           <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
             NVIDIA NIM Inference Models (Prompt Principle #4 & #39)
           </h2>
@@ -206,7 +210,7 @@ export const SettingsPage: React.FC = () => {
               type="text"
               value={chatModel}
               onChange={(e) => setChatModel(e.target.value)}
-              className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-600 font-mono bg-slate-50/50"
+              className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg focus-visible:outline-none focus:ring-2 focus:ring-emerald-600 font-mono bg-slate-50/50"
             />
             <span className="text-[10px] text-slate-400 mt-0.5 block">Configurable via NVIDIA_CHAT_MODEL in .env</span>
           </div>
@@ -219,7 +223,7 @@ export const SettingsPage: React.FC = () => {
               type="text"
               value={fallbackModel}
               onChange={(e) => setFallbackModel(e.target.value)}
-              className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-600 font-mono bg-slate-50/50"
+              className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg focus-visible:outline-none focus:ring-2 focus:ring-emerald-600 font-mono bg-slate-50/50"
             />
             <span className="text-[10px] text-slate-400 mt-0.5 block">Invoked if primary model experiences timeout or rate limit</span>
           </div>
@@ -232,23 +236,24 @@ export const SettingsPage: React.FC = () => {
               type="text"
               value={embedModel}
               onChange={(e) => setEmbedModel(e.target.value)}
-              className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-600 font-mono bg-slate-50/50"
+              className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg focus-visible:outline-none focus:ring-2 focus:ring-emerald-600 font-mono bg-slate-50/50"
             />
             <span className="text-[10px] text-slate-400 mt-0.5 block">NVIDIA dense embedding pipeline</span>
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-slate-700 mb-1">
+            <label htmlFor="abstention-threshold" className="block text-xs font-medium text-slate-700 mb-1">
               Safe Abstention Threshold: {abstentionThreshold}%
             </label>
             <input
+              id="abstention-threshold"
               type="range"
               min="30"
               max="90"
               step="5"
               value={abstentionThreshold}
               onChange={(e) => setAbstentionThreshold(parseInt(e.target.value))}
-              className="w-full accent-emerald-600 cursor-pointer mt-2"
+              className="w-full accent-emerald-600 cursor-pointer mt-2 focus-visible:outline-none focus:ring-2 focus:ring-emerald-600"
             />
             <span className="text-[10px] text-slate-400 mt-0.5 block">Confidence below this triggers explicit safe abstention</span>
           </div>
@@ -258,7 +263,7 @@ export const SettingsPage: React.FC = () => {
       {/* System Diagnostics */}
       <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm space-y-4">
         <div className="flex items-center space-x-2 border-b border-slate-100 pb-3">
-          <Database className="w-4 h-4 text-emerald-700" />
+          <Database className="w-4 h-4 text-emerald-700" aria-hidden="true" />
           <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
             System Diagnostics & Knowledge Integrity
           </h2>
@@ -268,7 +273,7 @@ export const SettingsPage: React.FC = () => {
           <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg">
             <div className="text-[10px] uppercase font-bold text-slate-400">Backend API</div>
             <div className="font-bold text-emerald-700 mt-1 flex items-center space-x-1">
-              <CheckCircle2 className="w-3.5 h-3.5" />
+              <CheckCircle2 className="w-3.5 h-3.5" aria-hidden="true" />
               <span>{diagnostics.backendStatus}</span>
             </div>
           </div>
@@ -294,17 +299,17 @@ export const SettingsPage: React.FC = () => {
       <div className="flex items-center justify-between pt-2">
         <button
           onClick={handleReset}
-          className="flex items-center space-x-1.5 px-4 py-2 border border-slate-200 hover:bg-slate-100 text-slate-600 rounded-lg text-xs font-medium transition-colors"
+          className="flex items-center justify-center px-6 py-3.5 border border-slate-200 hover:bg-slate-100 text-slate-600 rounded-lg text-base font-medium transition-colors focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:opacity-50 transition-colors duration-200"
         >
-          <RotateCcw className="w-3.5 h-3.5" />
+          <RotateCcw className="w-4 h-4 mr-2" aria-hidden="true" />
           <span>Reset Defaults</span>
         </button>
 
         <button
           onClick={handleSave}
-          className="flex items-center space-x-2 px-6 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-xs font-bold shadow-sm transition-all"
+          className="flex items-center justify-center px-6 py-3.5 border border-transparent rounded-md shadow-sm text-white font-medium bg-emerald-600 hover:bg-emerald-700 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:opacity-50 transition-colors duration-200"
         >
-          <Save className="w-4 h-4" />
+          <Save className="w-4 h-4 mr-2" aria-hidden="true" />
           <span>Save System Parameters</span>
         </button>
       </div>

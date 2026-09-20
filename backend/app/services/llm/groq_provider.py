@@ -8,35 +8,32 @@ from app.core.llm_provider import LLMProvider, LLMResponse, StructuredLLMRespons
 
 logger = logging.getLogger(__name__)
 
-class NVIDIAProvider(LLMProvider):
-    """NVIDIA NIM API provider implementation"""
+class GroqProvider(LLMProvider):
+    """Groq API provider implementation"""
 
     def __init__(
         self,
         api_key: str,
-        base_url: str = "https://integrate.api.nvidia.com/v1",
-        chat_model: str = "openai/gpt-oss-120b",
-        embed_model: str = "nvidia/nemotron-3-embed-1b",
+        base_url: str = "https://api.groq.com/openai/v1",
+        chat_model: str = "llama-3.3-70b-versatile",
         fallback_chat_model: Optional[str] = None
     ):
         self.api_key = (api_key or "").strip()
-        self.base_url = (base_url or "https://integrate.api.nvidia.com/v1").rstrip("/")
+        self.base_url = (base_url or "https://api.groq.com/openai/v1").rstrip("/")
         self.chat_model = chat_model
-        self.embed_model = embed_model
         self.fallback_chat_model = fallback_chat_model
         self.headers = {"Content-Type": "application/json"}
-        if self.api_key and self.api_key != "your_nvidia_api_key_here":
+        if self.api_key and self.api_key != "your_groq_api_key_here":
             self.headers["Authorization"] = f"Bearer {self.api_key}"
         self._client: Optional[httpx.AsyncClient] = None
         self._client_loop = None
         self.call_stats = {
-            "llm_provider": "NVIDIA",
+            "llm_provider": "Groq",
             "llm_model": self.chat_model,
             "llm_called": False,
             "llm_calls_count": 0,
             "llm_latency": 0.0,
             "llm_error": None,
-            "embedding_model": self.embed_model
         }
 
     @property
@@ -60,7 +57,7 @@ class NVIDIAProvider(LLMProvider):
         return self._client
 
     def get_execution_telemetry(self) -> Dict[str, Any]:
-        """Return runtime LLM execution audit telemetry (Section 18)"""
+        """Return runtime LLM execution audit telemetry"""
         return dict(self.call_stats)
 
     async def chat(
@@ -70,10 +67,10 @@ class NVIDIAProvider(LLMProvider):
         max_tokens: Optional[int] = None,
         **kwargs
     ) -> LLMResponse:
-        """Send a chat completion request to NVIDIA NIM API"""
-        if not self.api_key or self.api_key == "your_nvidia_api_key_here":
-            self.call_stats["llm_error"] = "NVIDIA_API_KEY is not configured"
-            raise ValueError("NVIDIA_API_KEY is not configured. Running in local fallback mode.")
+        """Send a chat completion request to Groq API"""
+        if not self.api_key or self.api_key == "your_groq_api_key_here":
+            self.call_stats["llm_error"] = "GROQ_API_KEY is not configured"
+            raise ValueError("GROQ_API_KEY is not configured. Running in local fallback mode.")
 
         import time
         t0 = time.time()
@@ -113,7 +110,7 @@ class NVIDIAProvider(LLMProvider):
             )
 
         except Exception as e:
-            logger.error(f"NVIDIA API chat error: {str(e)}")
+            logger.error(f"Groq API chat error: {str(e)}")
             # Try fallback model if available
             if self.fallback_chat_model:
                 logger.info(f"Trying fallback model: {self.fallback_chat_model}")
@@ -153,8 +150,8 @@ class NVIDIAProvider(LLMProvider):
         **kwargs
     ) -> StructuredLLMResponse:
         """Get structured output matching a Pydantic model"""
-        if not self.api_key or self.api_key == "your_nvidia_api_key_here":
-            raise ValueError("NVIDIA_API_KEY is not configured. Running in local fallback mode.")
+        if not self.api_key or self.api_key == "your_groq_api_key_here":
+            raise ValueError("GROQ_API_KEY is not configured. Running in local fallback mode.")
         try:
             # Add instruction with JSON structure template
             try:
@@ -218,8 +215,6 @@ class NVIDIAProvider(LLMProvider):
                 content = raw_content.strip()
                 if content.startswith("```json"):
                     content = content[7:]
-                if content.startswith("```"):
-                    content = content[3:]
                 if content.endswith("```"):
                     content = content[:-3]
                 content = content.strip()
@@ -252,7 +247,7 @@ class NVIDIAProvider(LLMProvider):
             )
 
         except Exception as e:
-            logger.error(f"NVIDIA API structured output error: {str(e)}")
+            logger.error(f"Groq API structured output error: {str(e)}")
             # Try fallback model if available
             if self.fallback_chat_model:
                 logger.info(f"Trying fallback model for structured output: {self.fallback_chat_model}")
@@ -271,8 +266,6 @@ class NVIDIAProvider(LLMProvider):
                     content = raw_content.strip()
                     if content.startswith("```json"):
                         content = content[7:]
-                    if content.startswith("```"):
-                        content = content[3:]
                     if content.endswith("```"):
                         content = content[:-3]
                     content = content.strip()
@@ -293,37 +286,17 @@ class NVIDIAProvider(LLMProvider):
             else:
                 raise e
 
-    async def embed(self, texts: List[str]) -> List[List[float]]:
-        """Generate vector embeddings using NVIDIA NIM embedding endpoint"""
-        if not self.api_key or self.api_key == "your_nvidia_api_key_here":
-            raise ValueError("NVIDIA_API_KEY is not configured.")
-        try:
-            payload = {
-                "model": self.embed_model,
-                "input": texts
-            }
-            response = await self.client.post(
-                f"{self.base_url}/embeddings",
-                json=payload
-            )
-            response.raise_for_status()
-            result = response.json()
-            return [item["embedding"] for item in result.get("data", [])]
-        except Exception as e:
-            logger.error(f"NVIDIA embedding error: {e}")
-            raise e
-
     async def health_check(self) -> Dict[str, Any]:
         """Perform minimal authenticated test completion measuring real roundtrip latency"""
         import time
-        if not self.api_key or self.api_key == "your_nvidia_api_key_here":
+        if not self.api_key or self.api_key == "your_groq_api_key_here":
             return {
-                "provider": "nvidia",
+                "provider": "groq",
                 "configured": False,
                 "reachable": False,
                 "model": self.chat_model,
                 "latency_ms": None,
-                "error": "NVIDIA_API_KEY is not configured"
+                "error": "GROQ_API_KEY is not configured"
             }
 
         t0 = time.time()
@@ -338,7 +311,7 @@ class NVIDIAProvider(LLMProvider):
             latency_ms = int((time.time() - t0) * 1000)
             if resp.status_code == 200:
                 return {
-                    "provider": "nvidia",
+                    "provider": "groq",
                     "configured": True,
                     "reachable": True,
                     "model": self.chat_model,
@@ -347,7 +320,7 @@ class NVIDIAProvider(LLMProvider):
                 }
             else:
                 return {
-                    "provider": "nvidia",
+                    "provider": "groq",
                     "configured": True,
                     "reachable": False,
                     "model": self.chat_model,
@@ -357,7 +330,7 @@ class NVIDIAProvider(LLMProvider):
         except Exception as e:
             latency_ms = int((time.time() - t0) * 1000)
             return {
-                "provider": "nvidia",
+                "provider": "groq",
                 "configured": True,
                 "reachable": False,
                 "model": self.chat_model,

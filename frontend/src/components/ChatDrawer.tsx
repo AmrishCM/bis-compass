@@ -1,6 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { X, Send, Bot, User, BookOpen, ShieldAlert, Sparkles, RefreshCw, Globe, ExternalLink } from 'lucide-react';
+import { X, Send, Bot, User, BookOpen, ShieldAlert, Sparkles, RefreshCw, Globe, ExternalLink, Mic, MicOff } from 'lucide-react';
 import { api } from '../services/api';
+import { useSpeechRecognition } from '../hooks/useSpeechRecognition';
+import { useLanguage } from '../i18n/LanguageContext';
 
 interface ChatDrawerProps {
   isOpen: boolean;
@@ -36,6 +38,11 @@ export const ChatDrawer: React.FC<ChatDrawerProps> = ({ isOpen, onClose, initial
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const { currentLanguage = 'en' } = useLanguage();
+  const { isListening, startListening, stopListening, isSupported: isSpeechSupported } = useSpeechRecognition({
+    onResult: (text) => setInput(text),
+  });
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -204,9 +211,26 @@ export const ChatDrawer: React.FC<ChatDrawerProps> = ({ isOpen, onClose, initial
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="Ask about standards, testing, licensing, or rules..."
+              placeholder={`Ask about standards, testing, licensing (${(currentLanguage || 'en').toUpperCase()})...`}
               className="flex-1 border border-slate-300 rounded-md px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-emerald-600"
             />
+            {isSpeechSupported && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (isListening) stopListening();
+                  else startListening(currentLanguage);
+                }}
+                className={`p-2 rounded-md border transition cursor-pointer ${
+                  isListening
+                    ? 'bg-rose-50 border-rose-300 text-rose-600 animate-pulse'
+                    : 'border-slate-300 text-slate-500 hover:text-emerald-700 hover:bg-slate-50'
+                }`}
+                title="Voice Input (Speech recognition)"
+              >
+                {isListening ? <MicOff className="h-3.5 w-3.5" /> : <Mic className="h-3.5 w-3.5" />}
+              </button>
+            )}
             <button
               type="submit"
               disabled={isLoading || !input.trim()}

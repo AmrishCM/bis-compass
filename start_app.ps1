@@ -11,6 +11,21 @@ Write-Host "API Docs:     http://127.0.0.1:8002/docs" -ForegroundColor Cyan
 Write-Host "Frontend UI:  http://localhost:5174" -ForegroundColor Cyan
 Write-Host "Press Ctrl+C or Enter to stop the application.`n" -ForegroundColor Yellow
 
+function Stop-PortProcess {
+    param([int]$Port)
+    $conns = Get-NetTCPConnection -LocalPort $Port -ErrorAction SilentlyContinue
+    if ($conns) {
+        $pids = $conns | Select-Object -ExpandProperty OwningProcess -Unique | Where-Object { $_ -gt 4 }
+        foreach ($p in $pids) {
+            Stop-Process -Id $p -Force -ErrorAction SilentlyContinue
+        }
+    }
+}
+
+# Clean up any stale processes on target ports before launching
+Stop-PortProcess -Port 8002
+Stop-PortProcess -Port 5174
+
 # Start Backend Server
 Write-Host "Starting Backend (FastAPI / Uvicorn on port 8002)..." -ForegroundColor DarkCyan
 $backendJob = Start-Job -ScriptBlock {
@@ -49,5 +64,9 @@ if ($frontendJob) {
     Stop-Job -Job $frontendJob -ErrorAction SilentlyContinue
     Remove-Job -Job $frontendJob -ErrorAction SilentlyContinue
 }
+
+# Ensure child processes on ports are terminated
+Stop-PortProcess -Port 8002
+Stop-PortProcess -Port 5174
 
 Write-Host "BIS-Compass stopped successfully." -ForegroundColor Green

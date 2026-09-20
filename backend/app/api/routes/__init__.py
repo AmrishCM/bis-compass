@@ -16,6 +16,8 @@ from .audit import router as audit_router
 from .ai_health import router as ai_health_router
 from .research_health import router as research_health_router
 from .translate import router as translate_router
+from .consumer import router as consumer_router
+from .updates import router as updates_router
 
 __all__ = [
     "analyze_router",
@@ -33,4 +35,6 @@ __all__ = [
     "ai_health_router",
     "research_health_router",
     "translate_router",
+    "consumer_router",
+    "updates_router",
 ]
