@@ -50,7 +50,7 @@ class Settings(BaseSettings):
 
     # Upload settings
     MAX_UPLOAD_SIZE: int = 10485760  # 10MB
-    UPLOAD_DIR: str = "/app/uploads"
+    UPLOAD_DIR: str = "uploads"
 
     class Config:
         env_file = ".env"

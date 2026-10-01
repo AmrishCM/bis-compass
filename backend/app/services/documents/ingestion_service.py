@@ -21,7 +21,12 @@ class DocumentIngestionService:
         self.processor_factory = get_processor_factory()
 
         # Ensure upload directory exists
-        os.makedirs(self.upload_dir, exist_ok=True)
+        try:
+            os.makedirs(self.upload_dir, exist_ok=True)
+        except OSError:
+            import tempfile
+            self.upload_dir = os.path.join(tempfile.gettempdir(), "bis_compass_uploads")
+            os.makedirs(self.upload_dir, exist_ok=True)
 
     async def ingest_file(
         self,
