@@ -27,9 +27,9 @@ def generate_embedding(text: str) -> list:
 
 def seed_database(db: Session):
     """Seed the database with verified Indian Standards and official BIS sources"""
-    existing = db.query(Standard).first()
-    if existing:
-        logger.info("Database already contains standards. Skipping seed.")
+    valid_standards_count = db.query(Standard).filter(Standard.title.isnot(None), Standard.title != '').count()
+    if valid_standards_count >= 10:
+        logger.info(f"Database already contains {valid_standards_count} verified standards. Skipping seed.")
         return
 
     logger.info("Seeding verified BIS knowledge base...")
@@ -73,20 +73,26 @@ def seed_database(db: Session):
 
     source_objs = {}
     for s in sources_data:
-        src = Source(
-            source_type=s["source_type"],
-            organization=s["organization"],
-            url=s["url"],
-            title=s["title"],
-            publication_date=s["publication_date"],
-            last_verified=datetime.utcnow(),
-            authority_level=s["authority_level"],
-            checksum=s["checksum"],
-            version=s["version"]
-        )
-        db.add(src)
-        db.flush()
-        source_objs[s["id"]] = src
+        existing_src = db.query(Source).filter(Source.id == s["id"]).first()
+        if not existing_src:
+            existing_src = db.query(Source).filter(Source.title == s["title"]).first()
+        if existing_src:
+            source_objs[s["id"]] = existing_src
+        else:
+            src = Source(
+                source_type=s["source_type"],
+                organization=s["organization"],
+                url=s["url"],
+                title=s["title"],
+                publication_date=s["publication_date"],
+                last_verified=datetime.utcnow(),
+                authority_level=s["authority_level"],
+                checksum=s["checksum"],
+                version=s["version"]
+            )
+            db.add(src)
+            db.flush()
+            source_objs[s["id"]] = src
 
     # 2. Standards, Clauses & Schemes
     standards_catalog = [
@@ -643,11 +649,248 @@ def seed_database(db: Session):
                     "testing_required": True
                 }
             ]
+        },
+
+        # Standard 11: IS 4375:2019 (Men's Cotton Knitted Sports Shirt / T-Shirt)
+        {
+            "standard_number": "IS 4375:2019",
+            "title": "Specification for Men's Cotton Knitted Sports Shirt/T-Shirt (Second Revision)",
+            "scope": "Prescribes requirements, dimensions, sampling procedure, and testing methods for men's cotton knitted sports shirts, T-shirts, and casual polo garments made of 100% combed or carded cotton yarn.",
+            "status": "active",
+            "edition": "Second Revision",
+            "publication_date": datetime(2019, 8, 1),
+            "effective_date": datetime(2020, 2, 1),
+            "source_id": 1,
+            "clauses": [
+                {
+                    "clause_number": "1.1",
+                    "heading": "Scope of Knitted Cotton Garments",
+                    "text": "This standard specifies requirements for men's cotton knitted sports shirts and T-shirts, plain or patterned, with short or long sleeves.",
+                    "page": 1,
+                    "section": "1. Scope"
+                },
+                {
+                    "clause_number": "4.2",
+                    "heading": "Yarn Quality and Fibre Composition",
+                    "text": "The fabric shall be knitted from 100 percent cotton yarn, single or folded, carded or combed, conforming to IS 171. Dimensional stability to washing shall not exceed 5 percent.",
+                    "page": 2,
+                    "section": "4. Materials"
+                },
+                {
+                    "clause_number": "5.1",
+                    "heading": "Colour Fastness Requirements",
+                    "text": "Colour fastness to washing (IS/ISO 105-C06), perspiration (IS 971), and rubbing (IS 766) shall not be less than Grade 4.",
+                    "page": 3,
+                    "section": "5. Performance Tests"
+                }
+            ],
+            "schemes": [
+                {
+                    "scheme_name": "Scheme I (ISI Mark Product Certification Scheme)",
+                    "description": "Voluntary / Commercial product certification for apparel and knitted textiles.",
+                    "conditions": "Factory inspection of knitting and sewing quality, dimensional stability tests, and azo dye testing.",
+                    "documents_required": json.dumps([
+                        "Fibre composition test report",
+                        "Dimensional stability after wash test report",
+                        "Colour fastness test results"
+                    ]),
+                    "testing_required": True
+                }
+            ]
+        },
+
+        # Standard 12: IS 544:2014 (Groundnut Oil)
+        {
+            "standard_number": "IS 544:2014",
+            "title": "Groundnut Oil - Specification (Third Revision)",
+            "scope": "Prescribes requirements and methods of sampling and test for groundnut oil (peanut oil) expressed or solvent extracted from clean and sound groundnuts (Arachis hypogaea Linn.).",
+            "status": "active",
+            "edition": "Third Revision",
+            "publication_date": datetime(2014, 3, 1),
+            "effective_date": datetime(2014, 9, 1),
+            "source_id": 1,
+            "clauses": [
+                {
+                    "clause_number": "1.1",
+                    "heading": "Scope of Edible Groundnut Oil",
+                    "text": "This standard prescribes the requirements and methods of sampling and test for groundnut oil for edible and industrial use.",
+                    "page": 1,
+                    "section": "1. Scope"
+                },
+                {
+                    "clause_number": "4.1",
+                    "heading": "Quality Characteristics and Refractive Index",
+                    "text": "The oil shall be clear and free from rancidity, adulterants, sediment, suspended and other foreign matter. Refractive index at 40°C shall be 1.4620 to 1.4640. Saponification value shall be 188 to 196.",
+                    "page": 2,
+                    "section": "4. Requirements"
+                },
+                {
+                    "clause_number": "5.2",
+                    "heading": "Free Fatty Acids and Acid Value",
+                    "text": "Acid value for refined groundnut oil shall not exceed 0.5, and for raw groundnut oil shall not exceed 6.0.",
+                    "page": 3,
+                    "section": "5. Chemical Tests"
+                }
+            ],
+            "schemes": [
+                {
+                    "scheme_name": "Scheme I (ISI Mark Certification Scheme)",
+                    "description": "Certification for packaged edible oils ensuring consumer food safety and adulteration prevention.",
+                    "conditions": "Regular testing of moisture, insoluble impurities, Bellier turbidity, and fatty acid profile.",
+                    "documents_required": json.dumps([
+                        "FSSAI manufacturing license copy",
+                        "Batch test analysis for FFA and peroxide value",
+                        "Heavy metal and aflatoxin test reports"
+                    ]),
+                    "testing_required": True
+                }
+            ]
+        },
+
+        # Standard 13: IS 2062:2011 (Hot Rolled Medium and High Tensile Structural Steel)
+        {
+            "standard_number": "IS 2062:2011",
+            "title": "Hot Rolled Medium and High Tensile Structural Steel - Specification",
+            "scope": "Covers the requirements of steel plates, sections, flats, bars, and beams for use in structural steel fabrication.",
+            "status": "active",
+            "edition": "Seventh Revision",
+            "publication_date": datetime(2011, 10, 1),
+            "effective_date": datetime(2012, 4, 1),
+            "source_id": 1,
+            "clauses": [
+                {
+                    "clause_number": "1.1",
+                    "heading": "Scope of Structural Steel",
+                    "text": "Prescribes chemical and mechanical requirements for hot rolled steel products used for bolted, riveted, and welded structural work.",
+                    "page": 1,
+                    "section": "1. Scope"
+                },
+                {
+                    "clause_number": "8.1",
+                    "heading": "Tensile and Yield Strength",
+                    "text": "For Grade E250, minimum yield strength shall be 250 MPa, tensile strength 410 MPa, and elongation minimum 23 percent.",
+                    "page": 5,
+                    "section": "8. Mechanical Properties"
+                }
+            ],
+            "schemes": [
+                {
+                    "scheme_name": "Scheme I (ISI Mark Product Certification Scheme)",
+                    "description": "Compulsory certification under Steel and Steel Products Quality Control Order.",
+                    "conditions": "Mandatory ladle chemical analysis and Charpy V-notch impact testing.",
+                    "documents_required": json.dumps([
+                        "Ladle chemical analysis records",
+                        "Tensile and bend test certificates"
+                    ]),
+                    "testing_required": True
+                }
+            ]
+        },
+
+        # Standard 14: IS 302-1:2024 (Safety of Household and Similar Electrical Appliances)
+        {
+            "standard_number": "IS 302-1:2024",
+            "title": "Safety of Household and Similar Electrical Appliances - General Requirements",
+            "scope": "Deals with the safety of electrical appliances for household and similar purposes, their rated voltage being not more than 250 V for single-phase appliances.",
+            "status": "active",
+            "edition": "Sixth Revision",
+            "publication_date": datetime(2024, 1, 15),
+            "effective_date": datetime(2024, 7, 15),
+            "source_id": 1,
+            "clauses": [
+                {
+                    "clause_number": "1.1",
+                    "heading": "Scope of Household Electrical Safety",
+                    "text": "Applies to electrical appliances for household and commercial use to protect persons and domestic animals against electrical, mechanical, and thermal hazards.",
+                    "page": 1,
+                    "section": "1. Scope"
+                },
+                {
+                    "clause_number": "8.1",
+                    "heading": "Protection Against Access to Live Parts",
+                    "text": "Appliances shall be so constructed that there is adequate protection against accidental contact with live parts when tested with standard test probe B.",
+                    "page": 8,
+                    "section": "8. Electrical Safety"
+                },
+                {
+                    "clause_number": "13.2",
+                    "heading": "Electric Strength and Leakage Current",
+                    "text": "The leakage current shall not exceed 0.75 mA for Class I portable appliances when tested at 1.1 times rated voltage.",
+                    "page": 14,
+                    "section": "13. Insulation"
+                }
+            ],
+            "schemes": [
+                {
+                    "scheme_name": "Scheme I (ISI Mark Certification Scheme)",
+                    "description": "Compulsory certification under Electrical Appliances (Quality Control) Order.",
+                    "conditions": "High-voltage breakdown testing, thermal endurance, and fire resistance glow-wire test.",
+                    "documents_required": json.dumps([
+                        "Comprehensive electrical safety test certificate",
+                        "Critical components list conforming to IS standards"
+                    ]),
+                    "testing_required": True
+                }
+            ]
+        },
+
+        # Standard 15: IS 15820:2009 (General Requirements for Assaying and Hallmarking Centres)
+        {
+            "standard_number": "IS 15820:2009",
+            "title": "General Requirements for Competence of Assaying and Hallmarking Centres",
+            "scope": "Specifies requirements for the competence of assaying and hallmarking centres for precious metals (Gold and Silver).",
+            "status": "active",
+            "edition": "First",
+            "publication_date": datetime(2009, 6, 1),
+            "effective_date": datetime(2009, 12, 1),
+            "source_id": 1,
+            "clauses": [
+                {
+                    "clause_number": "1.1",
+                    "heading": "Scope of Precious Metal Hallmarking",
+                    "text": "Specifies managerial and technical requirements for operating an official BIS recognized assaying and hallmarking centre.",
+                    "page": 1,
+                    "section": "1. Scope"
+                },
+                {
+                    "clause_number": "6.2",
+                    "heading": "Fire Assay for Gold Determination",
+                    "text": "Gold assaying shall be carried out according to the cupellation method (fire assay) prescribed in IS 1418 with accuracy better than ± 0.5 parts per thousand.",
+                    "page": 6,
+                    "section": "6. Testing Procedures"
+                }
+            ],
+            "schemes": [
+                {
+                    "scheme_name": "Hallmarking Scheme (IS 1417 / IS 15820)",
+                    "description": "Statutory hallmarking recognized under Hallmarking of Gold Jewellery Order.",
+                    "conditions": "Complete XRF screening, micro-fire assay, and automated 6-digit HUID laser marking.",
+                    "documents_required": json.dumps([
+                        "Assayer qualification certificates",
+                        "Muffle furnace calibration logs",
+                        "Laser marking system integration records"
+                    ]),
+                    "testing_required": True
+                }
+            ]
         }
     ]
 
     for std_data in standards_catalog:
-        src = source_objs[std_data["source_id"]]
+        src = source_objs.get(std_data["source_id"])
+        if not src:
+            src = db.query(Source).filter(Source.authority_level == 1).first()
+        source_id = src.id if src else 1
+
+        existing = db.query(Standard).filter(Standard.standard_number == std_data["standard_number"]).first()
+        if existing:
+            if not existing.title or existing.title == "":
+                existing.title = std_data["title"]
+                existing.scope = std_data["scope"]
+                existing.source_id = source_id
+                db.flush()
+            continue
+
         std = Standard(
             standard_number=std_data["standard_number"],
             title=std_data["title"],
@@ -656,13 +899,13 @@ def seed_database(db: Session):
             edition=std_data["edition"],
             publication_date=std_data["publication_date"],
             effective_date=std_data["effective_date"],
-            source_id=src.id
+            source_id=source_id
         )
         db.add(std)
         db.flush()
 
         # Add clauses with embeddings
-        for c in std_data["clauses"]:
+        for c in std_data.get("clauses", []):
             full_text = f"{std_data['standard_number']} {c['heading']}: {c['text']}"
             emb = generate_embedding(full_text)
             clause_obj = Clause(
@@ -684,7 +927,7 @@ def seed_database(db: Session):
                 conditions=sc["conditions"],
                 documents_required=sc["documents_required"],
                 testing_required=sc["testing_required"],
-                source_id=src.id,
+                source_id=source_id,
                 standard_id=std.id
             )
             db.add(scheme_obj)
@@ -850,6 +1093,9 @@ def seed_database(db: Session):
     ]
 
     for lab in labs_data:
+        existing_lab = db.query(LaboratoryRecord).filter(LaboratoryRecord.lab_name == lab["lab_name"]).first()
+        if existing_lab:
+            continue
         lab_obj = LaboratoryRecord(
             lab_name=lab["lab_name"],
             address=lab["address"],

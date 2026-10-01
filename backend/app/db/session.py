@@ -123,4 +123,15 @@ def init_db():
     except Exception as e:
         logger.warning(f"QCO records initialization notice: {e}")
 
+    # Ensure canonical verified Indian Standards and testing labs are seeded if empty
+    try:
+        from app.db.seed_data import seed_database
+        db = SessionLocal()
+        try:
+            seed_database(db)
+        finally:
+            db.close()
+    except Exception as e:
+        logger.warning(f"Seed database initialization notice: {e}")
+
     logger.info("Database tables verified/created.")

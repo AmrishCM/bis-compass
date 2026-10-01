@@ -223,8 +223,23 @@ Extract open-world structured information in JSON matching the schema."""
             materials.append("Steel")
 
         # Determine Product Identity vs Material
-        # Filter out common filler phrases
-        clean_text = re.sub(r'^(we\s+(manufacture|produce|make|create|develop|sell|design)|i\s+(want\s+to\s+sell|manufacture|make))\s+', '', d_lower).strip()
+        # 4-Concept NLU Pipeline: Strip conversational phrasing to extract Product Name, Commercial Intent, Domain
+        conversational_strip_patterns = [
+            r'^(i|we)\s+(want\s+to\s+)?(sell|buy|export|import|manufacture|produce|make|create|develop|design|market|distribute|trade|deal\s+in|supply|source)\s+(my|our)?\s*',
+            r'^(want\s+to\s+)?(sell|buy|export|import|manufacture|produce|make|distribute|market|trade)\s+(my|our)?\s*',
+            r'^(selling|buying|exporting|importing|manufacturing|producing|making|distributing|supplying|sourcing)\s+(my|our)?\s*',
+            r'^(looking\s+(for|to)\s+(sell|buy|manufacture|produce|certify|test|get\s+certified))\s+(my|our)?\s*',
+            r'^(need\s+(to\s+)?(certify|test|get\s+bis|check|verify))\s+(my|our)?\s*',
+            r'^(please\s+)?(help\s+(me|us)\s+)?(with\s+)?',
+            r'^(how\s+(do|can|to)\s+(i|we)\s+(certify|test|sell|manufacture|get|check))\s+',
+        ]
+        clean_text = d_lower
+        for pattern in conversational_strip_patterns:
+            clean_text = re.sub(pattern, '', clean_text).strip()
+        # Strip trailing geographic/market phrases: "across India", "in India", "pan India", "all over India"
+        clean_text = re.sub(r'\s+(across|in|all\s+over|pan|throughout|within)\s+(india|indian\s+market|the\s+country|domestic\s+market|internationally|global\s+market)$', '', clean_text).strip()
+        # Strip trailing intent phrases: "for certification", "for bis", "for testing"
+        clean_text = re.sub(r'\s+(for\s+(bis|certification|testing|compliance|export|sale|domestic\s+sale))$', '', clean_text).strip()
 
         # Identify physical form
         physical_form = "Solid Article"
@@ -286,6 +301,16 @@ Extract open-world structured information in JSON matching the schema."""
             product_family = "Electrochemical Cells & Batteries"
         elif any(w in d_lower for w in ["mineral water", "drinking water", "packaged water"]):
             product_family = "Packaged Potable Drinking Water"
+        elif any(w in d_lower for w in ["oil", "ghee", "butter", "edible", "mustard oil", "groundnut oil", "coconut oil", "sunflower oil", "soybean oil", "palm oil", "sesame oil", "rice bran oil", "vanaspati"]):
+            product_family = "Edible Oils & Fats"
+        elif any(w in d_lower for w in ["spice", "turmeric", "chilli", "pepper", "masala", "coriander", "cumin"]):
+            product_family = "Spices & Condiments"
+        elif any(w in d_lower for w in ["honey", "sugar", "jaggery", "sweetener"]):
+            product_family = "Sweeteners & Sugar Products"
+        elif any(w in d_lower for w in ["milk", "dairy", "paneer", "curd", "yogurt", "cheese"]):
+            product_family = "Dairy Products"
+        elif any(w in d_lower for w in ["flour", "atta", "maida", "wheat", "rice", "grain", "cereal", "pulses", "dal"]):
+            product_family = "Grain, Cereal & Pulse Products"
         elif any(w in d_lower for w in ["tray", "container"]):
             product_family = "Containers & Molded Trays"
 
@@ -294,6 +319,11 @@ Extract open-world structured information in JSON matching the schema."""
 
         # Possible domains
         possible_domains = []
+        # Food / Edible products take domain priority over generic material classification
+        if product_family in ["Edible Oils & Fats", "Spices & Condiments", "Sweeteners & Sugar Products",
+                              "Dairy Products", "Grain, Cereal & Pulse Products",
+                              "Packaged Potable Drinking Water"]:
+            possible_domains.append("Food & Edible Products")
         if regulatory_chars["electrical"]:
             possible_domains.append("Electrical & Electronics")
         if regulatory_chars["food_contact"]:

@@ -438,14 +438,9 @@ def _build_analysis_response(
         if not technical_clauses:
             technical_clauses = [
                 {
-                    "clause_number": "1.1",
+                    "clause_number": "—",
                     "heading": "Scope & Field of Application",
-                    "text": f"Prescribes safety, chemical composition, and performance tolerances conforming to {primary['standard_number']}."
-                },
-                {
-                    "clause_number": "4.1",
-                    "heading": "Material Quality & Construction",
-                    "text": f"Products must be fabricated from approved grades meeting Indian Standard specifications."
+                    "text": "Clause-level evidence: Not verified from retrieved source. Refer to the official published standard document for authoritative clause text."
                 }
             ]
 
@@ -517,14 +512,14 @@ def _build_analysis_response(
             tests_block.append({
                 "test_name": tr.get("test_type", "Conformity Test"),
                 "what_it_checks": tr.get("description", "Verifies compliance with physical and performance thresholds."),
-                "test_method": tr.get("test_method", "As specified in official Indian Standard"),
+                "test_method": tr.get("test_method") or "Testing method could not be verified from retrieved authoritative sources",
                 "is_mandatory": tr.get("is_mandatory", True),
                 "source_reference": tr.get("source_reference", "")
             })
     if not tests_block:
         tests_block = [
-            {"test_name": "Material Composition & Safety Verification", "what_it_checks": "Verifies that the material is non-toxic and meets prescribed purity standards.", "test_method": "Chemical / Spectrometric Analysis", "is_mandatory": True, "source_reference": "Applicable BIS Clause"},
-            {"test_name": "Performance & Durability Evaluation", "what_it_checks": "Ensures the product withstands standard operational stress and usage demands.", "test_method": "Laboratory Performance Protocol", "is_mandatory": True, "source_reference": "Applicable BIS Clause"}
+            {"test_name": "Material Composition & Safety Verification", "what_it_checks": "Verifies that the material is non-toxic and meets prescribed purity standards.", "test_method": "Testing method could not be verified from retrieved authoritative sources", "is_mandatory": True, "source_reference": ""},
+            {"test_name": "Performance & Durability Evaluation", "what_it_checks": "Ensures the product withstands standard operational stress and usage demands.", "test_method": "Testing method could not be verified from retrieved authoritative sources", "is_mandatory": True, "source_reference": ""}
         ]
 
     # ---- Laboratories block ----
@@ -644,6 +639,30 @@ def _build_analysis_response(
         db.commit()
     except Exception as log_err:
         logger.warning(f"Failed to record audit log: {log_err}")
+
+    # ---- Source Tier Classification (5-Tier Hierarchy) ----
+    raw_sources = getattr(result, 'sources_investigated', [])
+    tier_1_official = []  # bis.gov.in, services.bis.gov.in, manakonline.in
+    tier_2_gazette = []   # egazette.gov.in, legislative government portals
+    tier_3_govt = []      # other .gov.in / .nic.in domains
+    tier_4_academic = []  # .edu.in / .ac.in / research journals
+    tier_5_web = []       # commercial blogs, generic web
+
+    for src in raw_sources:
+        url = src.get('url', '') if isinstance(src, dict) else getattr(src, 'url', '')
+        domain = src.get('domain', '') if isinstance(src, dict) else getattr(src, 'domain', '')
+        domain_lower = domain.lower() if domain else ''
+
+        if any(d in domain_lower for d in ['bis.gov.in', 'bis.org.in', 'services.bis', 'manakonline']):
+            tier_1_official.append(src)
+        elif any(d in domain_lower for d in ['egazette', 'gazette', 'legislative']):
+            tier_2_gazette.append(src)
+        elif any(d in domain_lower for d in ['.gov.in', '.nic.in', 'india.gov']):
+            tier_3_govt.append(src)
+        elif any(d in domain_lower for d in ['.edu', '.ac.in', 'research', 'journal', 'niscair']):
+            tier_4_academic.append(src)
+        else:
+            tier_5_web.append(src)
 
     # ---- Compose final response ----
     response = {
@@ -790,7 +809,14 @@ def _build_analysis_response(
         "_audit": {
             "research_trace": getattr(result, 'research_trace', {}),
             "research_stages": getattr(result, 'research_stages', []),
-            "sources_investigated": getattr(result, 'sources_investigated', []),
+            "sources_investigated": raw_sources,
+            "classified_sources": {
+                "tier_1_official_bis": tier_1_official,
+                "tier_2_gazette_legal": tier_2_gazette,
+                "tier_3_government": tier_3_govt,
+                "tier_4_academic": tier_4_academic,
+                "tier_5_additional_web_context": tier_5_web,
+            },
             "pipeline": getattr(result, 'pipeline_stats', {}),
             "agent_execution_times": result.agent_execution_times,
             "is_live_research": getattr(result, 'is_live_research', True),
@@ -798,4 +824,5 @@ def _build_analysis_response(
     }
 
     return response
+
 

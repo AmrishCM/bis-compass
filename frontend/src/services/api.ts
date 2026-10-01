@@ -425,6 +425,11 @@ export const api = {
     return res.data;
   },
 
+  async seedStandards() {
+    const res = await apiClient.post('/standards/seed');
+    return res.data;
+  },
+
   async getStandardDetail(id: number) {
     const res = await apiClient.get(`/standards/${id}`);
     return res.data;

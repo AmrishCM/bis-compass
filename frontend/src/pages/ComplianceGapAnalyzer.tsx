@@ -347,17 +347,6 @@ export const ComplianceGapAnalyzer: React.FC = () => {
                   </div>
 
                   <div className="flex items-center space-x-3 shrink-0">
-                    <div className="text-right">
-                      <div className="text-2xl font-black text-emerald-700">
-                        {gapResult.compliance_percentage}%
-                      </div>
-                      <div className="text-[10px] uppercase font-bold text-slate-400">
-                        Compliance Readiness
-                      </div>
-                    </div>
-
-                    <div className="h-10 w-px bg-slate-200" />
-
                     <div>
                       <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold ${
                         gapResult.risk_level === 'Low'
@@ -372,18 +361,64 @@ export const ComplianceGapAnalyzer: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Progress bar */}
-                <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden mt-4">
-                  <div
-                    className={`h-full transition-all duration-500 ${
-                      gapResult.compliance_percentage > 70
-                        ? 'bg-emerald-600'
-                        : gapResult.compliance_percentage > 40
-                        ? 'bg-amber-500'
-                        : 'bg-red-500'
-                    }`}
-                    style={{ width: `${gapResult.compliance_percentage}%` }}
-                  />
+                {/* Verifiable Checklist Breakdown (replaces arbitrary percentage) */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4">
+                  <div className="bg-slate-50 rounded-lg p-3 text-center border border-slate-200">
+                    <div className="text-lg font-black text-slate-900">
+                      {gapResult.fulfilled_requirements.length + gapResult.missing_requirements.length + (gapResult.partial_requirements?.length || 0)}
+                    </div>
+                    <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mt-0.5">
+                      Requirements Assessed
+                    </div>
+                  </div>
+                  <div className="bg-emerald-50 rounded-lg p-3 text-center border border-emerald-200">
+                    <div className="text-lg font-black text-emerald-700">
+                      {gapResult.fulfilled_requirements.length}
+                    </div>
+                    <div className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider mt-0.5">
+                      Verified Fulfilled
+                    </div>
+                  </div>
+                  <div className="bg-red-50 rounded-lg p-3 text-center border border-red-200">
+                    <div className="text-lg font-black text-red-700">
+                      {gapResult.missing_requirements.length}
+                    </div>
+                    <div className="text-[10px] font-bold text-red-600 uppercase tracking-wider mt-0.5">
+                      Potential Gaps
+                    </div>
+                  </div>
+                  <div className="bg-amber-50 rounded-lg p-3 text-center border border-amber-200">
+                    <div className="text-lg font-black text-amber-700">
+                      {gapResult.partial_requirements?.length || 0}
+                    </div>
+                    <div className="text-[10px] font-bold text-amber-600 uppercase tracking-wider mt-0.5">
+                      Partially Met / Unassessable
+                    </div>
+                  </div>
+                </div>
+
+                {/* Compact progress bar with disclaimer */}
+                <div className="mt-3">
+                  <div className="flex items-center justify-between text-[10px] text-slate-500 mb-1">
+                    <span className="font-semibold">Computed Readiness Estimate</span>
+                    <span className="font-bold text-slate-700">{gapResult.compliance_percentage}%</span>
+                  </div>
+                  <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full transition-all duration-500 ${
+                        gapResult.compliance_percentage > 70
+                          ? 'bg-emerald-600'
+                          : gapResult.compliance_percentage > 40
+                          ? 'bg-amber-500'
+                          : 'bg-red-500'
+                      }`}
+                      style={{ width: `${gapResult.compliance_percentage}%` }}
+                    />
+                  </div>
+                  <p className="text-[10px] text-slate-400 mt-1 italic">
+                    Based on {gapResult.fulfilled_requirements.length + gapResult.missing_requirements.length + (gapResult.partial_requirements?.length || 0)} verified requirements.
+                    This is an automated estimate — refer to individual clause assessments above for authoritative detail.
+                  </p>
                 </div>
               </div>
 

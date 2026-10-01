@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Compass, ShieldCheck, Cpu, MessageSquare, Globe, Sun, Moon, Volume2 } from 'lucide-react';
 import { useLanguage, SUPPORTED_LANGUAGES, SupportedLanguage } from '../i18n/LanguageContext';
+import { apiClient } from '../services/api';
 
 interface NavbarProps {
   onOpenChat?: () => void;
@@ -8,6 +9,24 @@ interface NavbarProps {
 
 export const Navbar: React.FC<NavbarProps> = ({ onOpenChat }) => {
   const { language, setLanguage, t } = useLanguage();
+
+  // Fix 7: Live AI Engine Status Indicator
+  const [aiStatus, setAiStatus] = useState<'checking' | 'connected' | 'unavailable'>('checking');
+
+  useEffect(() => {
+    const checkAiHealth = async () => {
+      try {
+        const res = await apiClient.get('/ai/health', { timeout: 8000 });
+        setAiStatus(res.data?.reachable ? 'connected' : 'unavailable');
+      } catch {
+        setAiStatus('unavailable');
+      }
+    };
+    checkAiHealth();
+    // Re-check every 60 seconds
+    const interval = setInterval(checkAiHealth, 60000);
+    return () => clearInterval(interval);
+  }, []);
 
   const applyDarkMode = (useDark: boolean) => {
     if (useDark) {
@@ -51,10 +70,27 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenChat }) => {
               <span className="font-semibold text-slate-800">BIS Gazette</span>
             </div>
 
-            <div className="hidden lg:flex items-center space-x-1.5 bg-slate-50 border border-slate-200 rounded-md px-2.5 py-1 text-xs text-slate-600">
-              <Cpu className="h-4 w-4 text-emerald-600" />
-              <span>Model:</span>
-              <span className="font-semibold text-slate-800">NVIDIA NIM</span>
+            {/* AI Engine Live Status Indicator */}
+            <div className={`hidden lg:flex items-center space-x-1.5 rounded-md px-2.5 py-1 text-xs border transition-all ${
+              aiStatus === 'connected'
+                ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                : aiStatus === 'unavailable'
+                ? 'bg-red-50 border-red-200 text-red-800'
+                : 'bg-slate-50 border-slate-200 text-slate-600 animate-pulse'
+            }`}>
+              <Cpu className={`h-4 w-4 ${
+                aiStatus === 'connected' ? 'text-emerald-600' :
+                aiStatus === 'unavailable' ? 'text-red-500' : 'text-slate-400'
+              }`} />
+              <span>AI Engine</span>
+              <span className={`inline-block h-2 w-2 rounded-full ${
+                aiStatus === 'connected' ? 'bg-emerald-500' :
+                aiStatus === 'unavailable' ? 'bg-red-500' : 'bg-slate-400'
+              }`} />
+              <span className="font-semibold">
+                {aiStatus === 'connected' ? 'Connected' :
+                 aiStatus === 'unavailable' ? 'Unavailable' : 'Checking…'}
+              </span>
             </div>
 
             {/* Dark Mode Toggle */}

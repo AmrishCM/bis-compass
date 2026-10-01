@@ -40,23 +40,48 @@ export const StandardsDirectory: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [totalCount, setTotalCount] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+  const [isSeeding, setIsSeeding] = useState(false);
+  const [liveSynced, setLiveSynced] = useState(false);
 
   const fetchStandards = async () => {
     setLoading(true);
+    setError(null);
     try {
       const res = await api.getStandards({
         q: searchQuery.trim() || undefined,
         status: statusFilter !== 'all' ? statusFilter : undefined,
         limit: 50
       });
-      if (res.success) {
+      if (res && res.success) {
         setStandards(res.standards || []);
         setTotalCount(res.total || 0);
+        setLiveSynced(res.live_synced || false);
+      } else if (typeof res === 'string' && (res as string).includes('<!DOCTYPE')) {
+        setError('Connected backend returned HTML. The server may still be deploying or spinning up.');
+      } else {
+        setStandards([]);
+        setTotalCount(0);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to load standards:', err);
+      setError('Unable to reach Indian Standards service. If on Render free tier, the server takes ~30-40s on cold start.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSeedDatabase = async () => {
+    setIsSeeding(true);
+    setError(null);
+    try {
+      await api.seedStandards();
+      await fetchStandards();
+    } catch (err: any) {
+      console.error('Failed to seed standards catalog:', err);
+      setError('Failed to seed standards database. Please ensure backend is reachable.');
+    } finally {
+      setIsSeeding(false);
     }
   };
 
@@ -85,6 +110,17 @@ export const StandardsDirectory: React.FC = () => {
         </div>
 
         <div className="flex items-center space-x-3">
+          {totalCount === 0 && (
+            <button
+              onClick={handleSeedDatabase}
+              disabled={isSeeding}
+              className="flex items-center space-x-1.5 px-3 py-2 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 text-emerald-800 text-xs font-semibold rounded-lg shadow-sm transition-all disabled:opacity-50"
+              title="Seed canonical verified Indian Standards"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isSeeding ? 'animate-spin' : ''}`} />
+              <span>{isSeeding ? 'Seeding...' : 'Seed Standards'}</span>
+            </button>
+          )}
           <button
             onClick={() => fetchStandards()}
             className="p-2 border border-slate-200 hover:bg-slate-100 rounded-lg text-slate-600 transition-colors"
@@ -101,6 +137,44 @@ export const StandardsDirectory: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {/* Backend Alert / Cold Start Notice */}
+      {error && (
+        <div className="bg-amber-50 border border-amber-200 text-amber-900 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+          <div className="flex items-center space-x-2.5">
+            <ShieldCheck className="w-5 h-5 text-amber-600 flex-shrink-0" />
+            <div>
+              <p className="font-semibold">{error}</p>
+              <p className="text-amber-700 text-[11px] mt-0.5">Free-tier instances may sleep after inactivity. Click Retry or Seed to reconnect.</p>
+            </div>
+          </div>
+          <div className="flex items-center space-x-2 self-end sm:self-auto">
+            <button
+              onClick={() => fetchStandards()}
+              className="px-3 py-1.5 bg-amber-700 hover:bg-amber-800 text-white rounded font-medium transition-colors"
+            >
+              Retry
+            </button>
+            <button
+              onClick={handleSeedDatabase}
+              disabled={isSeeding}
+              className="px-3 py-1.5 bg-white border border-amber-300 hover:bg-amber-100 text-amber-900 rounded font-medium transition-colors"
+            >
+              {isSeeding ? 'Seeding...' : 'Seed Catalog'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Live BIS Discovery Sync Notification */}
+      {liveSynced && (
+        <div className="bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-xl p-3 flex items-center space-x-2 text-xs">
+          <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+          <span>
+            <strong>Official BIS Live Sync:</strong> Fresh Indian Standards discovered in real-time from the official Bureau of Indian Standards Portal (<em>services.bis.gov.in</em>) and cached to repository.
+          </span>
+        </div>
+      )}
 
       {/* Search & Filters */}
       <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-center justify-between gap-3">
@@ -144,10 +218,32 @@ export const StandardsDirectory: React.FC = () => {
       ) : standards.length === 0 ? (
         <div className="bg-white border border-slate-200 rounded-xl p-12 text-center">
           <BookOpen className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-          <h3 className="text-base font-semibold text-slate-800">No matching Indian Standards found</h3>
-          <p className="text-xs text-slate-500 max-w-md mx-auto mt-1">
-            Try adjusting your search terms or verify against the BIS Standards Portal for newly notified standards.
+          <h3 className="text-base font-semibold text-slate-800">
+            {searchQuery ? `No matching standards for "${searchQuery}" in directory` : 'No Indian Standards Currently Indexed'}
+          </h3>
+          <p className="text-xs text-slate-500 max-w-md mx-auto mt-1 mb-4">
+            {searchQuery
+              ? 'Try searching by standard number (e.g., IS 17526, IS 4375, IS 694) or broader terms. The system will query the official BIS portal in real-time.'
+              : 'Populate the verified repository with canonical Indian Standards, clauses, schemes, and recognized testing laboratories.'}
           </p>
+          <div className="flex justify-center items-center gap-3">
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="px-3.5 py-2 text-xs font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
+              >
+                Clear Search
+              </button>
+            )}
+            <button
+              onClick={handleSeedDatabase}
+              disabled={isSeeding}
+              className="flex items-center space-x-2 px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-medium rounded-lg shadow-sm transition-all disabled:opacity-50"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isSeeding ? 'animate-spin' : ''}`} />
+              <span>{isSeeding ? 'Seeding Standards...' : 'Seed Canonical Standards Catalog'}</span>
+            </button>
+          </div>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

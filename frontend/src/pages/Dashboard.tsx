@@ -131,7 +131,7 @@ export const Dashboard: React.FC = () => {
               <CheckCircle2 className="h-3.5 w-3.5 mr-1 text-emerald-600" aria-hidden="true" /> Live Monitored
             </span>
             <span className="text-slate-500 font-medium bg-slate-100 px-1.5 py-0.5 rounded text-[10px]">
-              {loading ? '...' : `${stats?.counts?.standards_indexed ?? 4} Flagship Indexed`}
+              {loading ? '...' : `${stats?.dynamic_cache?.sources_cached ?? stats?.counts?.standards_indexed ?? 0} Sources Cached`}
             </span>
           </div>
         </div>
@@ -164,7 +164,7 @@ export const Dashboard: React.FC = () => {
               <ShieldCheck className="h-3.5 w-3.5 mr-1 text-red-600" aria-hidden="true" /> Gazette Enforced
             </span>
             <span className="text-slate-500 font-medium bg-slate-100 px-1.5 py-0.5 rounded text-[10px]">
-              {loading ? '...' : `${stats?.counts?.mandatory_qcos ?? 6} Active Orders`}
+              {loading ? '...' : `${stats?.dynamic_cache?.qco_records_tracked ?? stats?.counts?.mandatory_qcos ?? 0} Active Orders Tracked`}
             </span>
           </div>
         </div>
@@ -194,7 +194,7 @@ export const Dashboard: React.FC = () => {
               <Sparkles className="h-3.5 w-3.5 mr-1 text-indigo-600" aria-hidden="true" /> Multi-Scheme
             </span>
             <span className="text-slate-500 font-medium bg-slate-100 px-1.5 py-0.5 rounded text-[10px]">
-              {loading ? '...' : `${stats?.counts?.certification_schemes ?? 3} Active Models`}
+              {loading ? '...' : `${stats?.counts?.certification_schemes ?? 6} Active Models`}
             </span>
           </div>
         </div>
@@ -224,7 +224,7 @@ export const Dashboard: React.FC = () => {
               <Building2 className="h-3.5 w-3.5 mr-1 text-amber-600" aria-hidden="true" /> Verified Testing
             </span>
             <span className="text-slate-500 font-medium bg-slate-100 px-1.5 py-0.5 rounded text-[10px]">
-              {loading ? '...' : `${stats?.counts?.recognized_laboratories ?? 6} Benchmark Labs`}
+              {loading ? '...' : `${stats?.dynamic_cache?.labs_indexed ?? stats?.counts?.recognized_laboratories ?? 0} Labs Indexed`}
             </span>
           </div>
         </div>

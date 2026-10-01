@@ -9,17 +9,84 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/standards", tags=["Indian Standards Directory"])
 
 @router.get("", summary="List & Search Indian Standards")
-def list_standards(
+async def list_standards(
     q: Optional[str] = Query(None, description="Search term in standard number or title"),
     status: Optional[str] = Query(None, description="Filter by status (active, under_revision, etc.)"),
     limit: int = Query(20, ge=1, le=100),
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db)
 ):
-    query = db.query(Standard).join(Source)
+    query = db.query(Standard).outerjoin(Source).filter(Standard.title.isnot(None), Standard.title != '')
 
+    # Auto-seed if database is empty on fresh deployment
+    initial_count = query.count()
+    if initial_count == 0 and not q and not status:
+        try:
+            from app.db.seed_data import seed_database
+            seed_database(db)
+            query = db.query(Standard).outerjoin(Source).filter(Standard.title.isnot(None), Standard.title != '')
+        except Exception as seed_err:
+            logger.warning(f"Auto-seed during standards listing: {seed_err}")
+
+    live_synced = False
     if q:
         search_pattern = f"%{q.strip()}%"
+        filtered_query = query.filter(
+            (Standard.standard_number.ilike(search_pattern)) |
+            (Standard.title.ilike(search_pattern)) |
+            (Standard.scope.ilike(search_pattern))
+        )
+
+        # If zero local matches found, dynamically search official BIS portal
+        if filtered_query.count() == 0:
+            try:
+                from app.services.research.bis_discovery import get_bis_discovery_service
+                bis_svc = get_bis_discovery_service()
+                live_items = await bis_svc.search_by_keywords(q.strip(), max_results=10)
+                if not live_items and any(c.isdigit() for c in q):
+                    num_only = "".join(filter(str.isdigit, q))
+                    if len(num_only) >= 3:
+                        live_items = await bis_svc.search_by_standard_number(num_only)
+
+                if live_items:
+                    default_source = db.query(Source).filter(Source.authority_level == 1).first()
+                    source_id = default_source.id if default_source else 1
+                    seen_in_batch = set()
+                    for item in live_items:
+                        is_no = (item.get("is_number") or item.get("full_name") or "").strip()
+                        clean_title = (item.get("title") or item.get("full_name") or f"Indian Standard {is_no}").strip()
+                        if not is_no or is_no in seen_in_batch:
+                            continue
+                        seen_in_batch.add(is_no)
+                        existing = db.query(Standard).filter(Standard.standard_number.ilike(is_no)).first()
+                        if existing:
+                            if not existing.title or existing.title == "":
+                                existing.title = clean_title
+                                existing.scope = f"Indian Standard specification covering {clean_title}. Sourced live from official BIS portal."
+                        else:
+                            new_std = Standard(
+                                standard_number=is_no,
+                                title=clean_title,
+                                scope=f"Indian Standard specification covering {clean_title}. Sourced live from official BIS portal.",
+                                status="active",
+                                edition=str(item.get("year") or "Current"),
+                                source_id=source_id,
+                                is_qco_mandatory=False
+                            )
+                            db.add(new_std)
+                    try:
+                        db.commit()
+                        live_synced = True
+                    except Exception as commit_err:
+                        db.rollback()
+                        logger.warning(f"Failed to commit live discovered standards: {commit_err}")
+
+                    # Refresh query with newly ingested records
+                    query = db.query(Standard).outerjoin(Source).filter(Standard.title.isnot(None), Standard.title != '')
+            except Exception as live_err:
+                db.rollback()
+                logger.warning(f"Live BIS portal discovery during standards list: {live_err}")
+
         query = query.filter(
             (Standard.standard_number.ilike(search_pattern)) |
             (Standard.title.ilike(search_pattern)) |
@@ -43,8 +110,8 @@ def list_standards(
             "edition": s.edition,
             "publication_date": s.publication_date.isoformat() if s.publication_date else None,
             "effective_date": s.effective_date.isoformat() if s.effective_date else None,
-            "clause_count": len(s.clauses),
-            "scheme_count": len(s.schemes),
+            "clause_count": len(s.clauses) if s.clauses else 0,
+            "scheme_count": len(s.schemes) if s.schemes else 0,
             "source": {
                 "organization": s.source.organization if s.source else "BIS",
                 "authority_level": s.source.authority_level if s.source else 1,
@@ -57,8 +124,25 @@ def list_standards(
         "total": total,
         "limit": limit,
         "offset": offset,
+        "live_synced": live_synced,
         "standards": results
     }
+
+@router.post("/seed", summary="Seed / Refresh Canonical Indian Standards Database")
+def seed_standards(db: Session = Depends(get_db)):
+    """Seed or refresh verified canonical Indian Standards, schemes, and testing laboratories."""
+    try:
+        from app.db.seed_data import seed_database
+        seed_database(db)
+        count = db.query(Standard).filter(Standard.title.isnot(None), Standard.title != '').count()
+        return {
+            "success": True,
+            "message": f"Successfully seeded database with verified canonical Indian Standards. Total standards: {count}",
+            "total": count
+        }
+    except Exception as e:
+        logger.error(f"Failed to seed standards: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 import re
 
