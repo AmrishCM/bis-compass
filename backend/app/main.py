@@ -1,8 +1,10 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import uvicorn
 import logging
+import traceback
 
 from app.db.session import init_db
 from app.api.routes import (
@@ -57,6 +59,20 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    logger.error(f"Global unhandled exception on {request.url.path}: {str(exc)}", exc_info=True)
+    tb = traceback.format_exc()
+    return JSONResponse(
+        status_code=500,
+        content={"detail": f"Server error: {str(exc)}", "trace": tb[-500:]},
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "*",
+            "Access-Control-Allow-Headers": "*",
+        }
+    )
 
 # Register API Routers under /api
 app.include_router(analyze_router, prefix="/api")

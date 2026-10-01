@@ -79,8 +79,14 @@ async def analyze_product(
         )
 
     except Exception as e:
-        logger.error(f"Analysis failed: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Compliance analysis failed: {str(e)}")
+        import traceback
+        tb = traceback.format_exc()
+        logger.error(f"Analysis failed: {str(e)}\n{tb}")
+        from fastapi.responses import JSONResponse
+        return JSONResponse(
+            status_code=500,
+            content={"detail": f"Compliance analysis failed: {str(e)}", "error_type": type(e).__name__, "traceback": tb[-1000:]}
+        )
 
 
 @router.post("/clarify", summary="Continue Analysis Session with Dynamic Clarification Answer")
