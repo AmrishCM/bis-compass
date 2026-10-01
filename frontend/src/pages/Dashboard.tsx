@@ -105,13 +105,13 @@ export const Dashboard: React.FC = () => {
       <div className="space-y-4">
         <div className="bg-white p-4 rounded-lg border border-slate-200 shadow-2xs">
           <span className="text-[11px] font-semibold text-slate-500 block">
-            {t('dashboard_total_standards', 'Standards Indexed')}
+            {t('dashboard_total_standards', 'Total Standards Monitored')}
           </span>
           <div className="text-2xl font-black text-slate-900 mt-1">
             {loading ? (
               <div className="h-8 w-24 bg-slate-200 rounded animate-pulse" />
             ) : (
-              stats?.counts?.standards_indexed ?? 10
+              stats?.counts?.standards_indexed ?? 4
             )}
           </div>
           <span className="text-[10px] text-emerald-600 font-semibold flex items-center mt-1">
@@ -121,16 +121,16 @@ export const Dashboard: React.FC = () => {
 
         <div className="bg-white p-4 rounded-lg border border-slate-200 shadow-2xs">
           <span className="text-[11px] font-semibold text-slate-500 block">
-            {t('dashboard_mandatory_qcos', 'Verifiable Clauses')}
+            {t('dashboard_mandatory_qcos', 'Mandatory QCOs')}
           </span>
           <div className="text-2xl font-black text-slate-900 mt-1">
             {loading ? (
               <div className="h-8 w-24 bg-slate-200 rounded animate-pulse" />
             ) : (
-              stats?.counts?.clauses_indexed ?? 40
+              stats?.counts?.mandatory_qcos ?? stats?.counts?.clauses_indexed ?? 6
             )}
           </div>
-          <span className="text-[10px] text-slate-500 mt-1 block">Clause-level evidence</span>
+          <span className="text-[10px] text-slate-500 mt-1 block">Gazette Notified Orders</span>
         </div>
 
         <div className="bg-white p-4 rounded-lg border border-slate-200 shadow-2xs">
@@ -141,7 +141,7 @@ export const Dashboard: React.FC = () => {
             {loading ? (
               <div className="h-8 w-24 bg-slate-200 rounded animate-pulse" />
             ) : (
-              stats?.counts?.certification_schemes ?? 10
+              stats?.counts?.certification_schemes ?? 3
             )}
           </div>
           <span className="text-[10px] text-emerald-600 font-semibold mt-1 block">Scheme I & II (CRS)</span>
@@ -149,7 +149,7 @@ export const Dashboard: React.FC = () => {
 
         <div className="bg-white p-4 rounded-lg border border-slate-200 shadow-2xs">
           <span className="text-[11px] font-semibold text-slate-500 block">
-            {t('dashboard_accredited_labs', 'Accredited Labs')}
+            {t('dashboard_accredited_labs', 'Recognized Laboratories')}
           </span>
           <div className="text-2xl font-black text-slate-900 mt-1">
             {loading ? (
