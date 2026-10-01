@@ -11,6 +11,7 @@ router = APIRouter(prefix="/standards", tags=["Indian Standards Directory"])
 @router.get("", summary="List & Search Indian Standards (24,100+ Live Web Repository)")
 async def list_standards(
     q: Optional[str] = Query(None, description="Search term in standard number, title, or product keyword"),
+    search: Optional[str] = Query(None, description="Search term alias"),
     status: Optional[str] = Query(None, description="Filter by status (active, under_revision, etc.)"),
     division: Optional[str] = Query(None, description="BIS Division Council (Textiles, Electronics, Civil, Chemical, etc.)"),
     limit: int = Query(30, ge=1, le=100),
@@ -23,10 +24,11 @@ async def list_standards(
     in real-time without database storage limitations.
     """
     TOTAL_NATIONAL_STANDARDS = 24115
+    query_text = (q or search or "").strip()
 
     # 1. LIVE WEB RETRIEVAL BY USER QUERY (Keyword or IS Number)
-    if q and q.strip():
-        clean_q = q.strip()
+    if query_text:
+        clean_q = query_text
         from app.services.research.bis_discovery import get_bis_discovery_service
         bis_svc = get_bis_discovery_service()
 
