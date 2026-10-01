@@ -37,23 +37,11 @@ async def analyze_product(
     payload: AnalyzeRequest,
     db: Session = Depends(get_db)
 ):
-    """
-    Flagship Analysis Endpoint:
-    1. Extracts structured product understanding
-    2. Retrieves candidate standards via hybrid search
-    3. Performs clause-by-clause applicability matching ('Why does it apply?')
-    4. Determines certification path (ISI Mark / CRS / etc.)
-    5. Retrieves testing requirements and parameters
-    6. Identifies accredited testing laboratories
-    7. Performs compliance gap analysis if document text is provided
-    8. Validates citations and generates actionable compliance roadmap
-    """
     start_time = time.time()
-    orchestrator = OrchestratorAgent()
-
     session_id = payload.session_id or f"BC-2026-{uuid.uuid4().hex[:6].upper()}"
 
     try:
+        orchestrator = OrchestratorAgent()
         input_data = OrchestrationInput(
             product_description=payload.product_description,
             document_text=payload.document_text,
