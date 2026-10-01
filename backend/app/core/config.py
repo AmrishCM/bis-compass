@@ -24,6 +24,12 @@ class Settings(BaseSettings):
     GROQ_CHAT_MODEL: str = "llama-3.3-70b-versatile"
     GROQ_FALLBACK_CHAT_MODEL: str = "mixtral-8x7b-32768"
 
+    # Bhashini (Digital India / NLTM) API settings
+    BHASHINI_API_KEY: str = ""
+    BHASHINI_USER_ID: str = ""
+    BHASHINI_PIPELINE_ID: str = "64392f96daac500b55c543d7"
+    BHASHINI_INFERENCE_URL: str = "https://dhruva-api.bhashini.gov.in/services/inference/pipeline"
+
     # Security settings
     DEBUG: bool = True
     SECRET_KEY: str = "your-secret-key-here"

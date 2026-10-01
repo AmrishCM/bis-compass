@@ -18,6 +18,7 @@ class ChatMessage(BaseModel):
 class ChatRequest(BaseModel):
     messages: List[ChatMessage]
     standard_id: Optional[int] = None
+    language: Optional[str] = Field("en", description="User's selected language code (en, hi, ta, te, kn, ml, mr, bn, gu, pa, or)")
     stream: bool = False
 
 @router.post("", summary="Chat with BIS Compliance Intelligence Advisor")

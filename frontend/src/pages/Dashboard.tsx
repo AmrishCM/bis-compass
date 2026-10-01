@@ -14,11 +14,12 @@ import {
   RefreshCw
 } from 'lucide-react';
 import { api } from '../services/api';
-
+import { useLanguage } from '../i18n/LanguageContext';
 import { GazetteUpdatesWidget } from '../components/GazetteUpdatesWidget';
 
 export const Dashboard: React.FC = () => {
   const navigate = useNavigate();
+  const { t } = useLanguage();
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
@@ -84,17 +85,17 @@ export const Dashboard: React.FC = () => {
           <div className="mt-5 flex flex-wrap gap-3">
             <button
               onClick={() => navigate('/analyze')}
-              className="flex items-center justify-center px-6 py-3.5 border border-transparent rounded-md shadow-sm text-base font-medium text-emerald-800 bg-emerald-50 hover:bg-emerald-100 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:opacity-50 transition-colors duration-200"
+              className="flex items-center justify-center px-6 py-3.5 border border-transparent rounded-md shadow-sm text-base font-medium text-emerald-800 bg-emerald-50 hover:bg-emerald-100 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:opacity-50 transition-colors duration-200 cursor-pointer"
             >
               <Sparkles className="w-4 h-4 mr-2" aria-hidden="true" />
-              <span>Analyze a Product Now</span>
+              <span>{t('btn_analyze', 'Analyze a Product Now')}</span>
             </button>
             <button
               onClick={() => navigate('/standards')}
-              className="flex items-center justify-center px-6 py-3.5 border border-transparent rounded-md shadow-sm text-white font-medium bg-emerald-600 hover:bg-emerald-700 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:opacity-50 transition-colors duration-200"
+              className="flex items-center justify-center px-6 py-3.5 border border-transparent rounded-md shadow-sm text-white font-medium bg-emerald-600 hover:bg-emerald-700 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:opacity-50 transition-colors duration-200 cursor-pointer"
             >
               <BookOpen className="w-4 h-4 mr-2" aria-hidden="true" />
-              <span>Browse Standards Catalog</span>
+              <span>{t('nav_standards', 'Browse Standards Catalog')}</span>
             </button>
           </div>
         </div>
@@ -103,7 +104,9 @@ export const Dashboard: React.FC = () => {
       {/* Metrics Row - Single Column */}
       <div className="space-y-4">
         <div className="bg-white p-4 rounded-lg border border-slate-200 shadow-2xs">
-          <span className="text-[11px] font-semibold text-slate-500 block">Standards Indexed</span>
+          <span className="text-[11px] font-semibold text-slate-500 block">
+            {t('dashboard_total_standards', 'Standards Indexed')}
+          </span>
           <div className="text-2xl font-black text-slate-900 mt-1">
             {loading ? (
               <div className="h-8 w-24 bg-slate-200 rounded animate-pulse" />
@@ -117,7 +120,9 @@ export const Dashboard: React.FC = () => {
         </div>
 
         <div className="bg-white p-4 rounded-lg border border-slate-200 shadow-2xs">
-          <span className="text-[11px] font-semibold text-slate-500 block">Verifiable Clauses</span>
+          <span className="text-[11px] font-semibold text-slate-500 block">
+            {t('dashboard_mandatory_qcos', 'Verifiable Clauses')}
+          </span>
           <div className="text-2xl font-black text-slate-900 mt-1">
             {loading ? (
               <div className="h-8 w-24 bg-slate-200 rounded animate-pulse" />
@@ -129,7 +134,9 @@ export const Dashboard: React.FC = () => {
         </div>
 
         <div className="bg-white p-4 rounded-lg border border-slate-200 shadow-2xs">
-          <span className="text-[11px] font-semibold text-slate-500 block">Certification Schemes</span>
+          <span className="text-[11px] font-semibold text-slate-500 block">
+            {t('certification_scheme', 'Certification Schemes')}
+          </span>
           <div className="text-2xl font-black text-slate-900 mt-1">
             {loading ? (
               <div className="h-8 w-24 bg-slate-200 rounded animate-pulse" />
@@ -141,7 +148,9 @@ export const Dashboard: React.FC = () => {
         </div>
 
         <div className="bg-white p-4 rounded-lg border border-slate-200 shadow-2xs">
-          <span className="text-[11px] font-semibold text-slate-500 block">Accredited Labs</span>
+          <span className="text-[11px] font-semibold text-slate-500 block">
+            {t('dashboard_accredited_labs', 'Accredited Labs')}
+          </span>
           <div className="text-2xl font-black text-slate-900 mt-1">
             {loading ? (
               <div className="h-8 w-24 bg-slate-200 rounded animate-pulse" />

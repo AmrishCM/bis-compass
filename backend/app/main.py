@@ -22,7 +22,8 @@ from app.api.routes import (
     research_health_router,
     translate_router,
     consumer_router,
-    updates_router
+    updates_router,
+    voice_router
 )
 
 logging.basicConfig(
@@ -75,6 +76,7 @@ app.include_router(research_health_router, prefix="/api")
 app.include_router(translate_router, prefix="/api")
 app.include_router(consumer_router, prefix="/api")
 app.include_router(updates_router, prefix="/api")
+app.include_router(voice_router, prefix="/api")
 
 @app.get("/")
 async def root():

@@ -18,6 +18,7 @@ from .research_health import router as research_health_router
 from .translate import router as translate_router
 from .consumer import router as consumer_router
 from .updates import router as updates_router
+from .voice import router as voice_router
 
 __all__ = [
     "analyze_router",
@@ -37,4 +38,5 @@ __all__ = [
     "translate_router",
     "consumer_router",
     "updates_router",
+    "voice_router",
 ]

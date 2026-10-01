@@ -6,6 +6,9 @@ from dotenv import load_dotenv
 
 load_dotenv(r"e:\SIH2026\project\BIS-Compass\backend\.env", override=True)
 
+import pytest
+
+@pytest.mark.asyncio
 async def test():
     # 1. NVIDIA
     api_key_nv = os.getenv("NVIDIA_API_KEY")

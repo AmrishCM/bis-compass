@@ -261,15 +261,30 @@ class OpenWorldProductAnalyzer:
     def _detect_multi_product(self, text: str) -> MultiProductDetection:
         """Detect multi-product lists in user description (Section 29)"""
         lower = text.lower().strip()
-        cleaned = re.sub(r'^(?:we\s+manufacture|i\s+manufacture|we\s+make|i\s+make|we\s+produce|we\s+sell)\s*', '', lower)
+        # Separate primary product description from additional component / material details
+        primary_text = re.split(r'additional\s+details\s*:', lower)[0].strip()
+        cleaned = re.sub(r'^(?:we\s+manufacture|i\s+manufacture|we\s+make|i\s+make|we\s+produce|we\s+sell)\s*', '', primary_text)
         parts = re.split(r',\s*|\s+and\s+', cleaned)
         valid_items = [p.strip() for p in parts if len(p.strip().split()) >= 1 and len(p.strip()) > 3]
+
+        # Ignore parts that are clearly subcomponents, materials, or accessories rather than distinct finished products
+        non_product_indicators = [
+            "food-grade", "food contact", "silicone", "gasket", "screw cap", "cap", "liner",
+            "lid", "washer", "handle", "coating", "sleeve", "accessory", "packaging", "box"
+        ]
 
         keywords = ["bottle", "cable", "switch", "pipe", "heater", "helmet", "battery", "toy", "t-shirt", "cement", "wire", "oil", "food", "textile", "valve"]
         distinct_found = []
         for item in valid_items:
+            # Skip if it is an accessory or component specification
+            if any(ind in item for ind in non_product_indicators):
+                continue
             for kw in keywords:
-                if kw in item and not any(kw in existing for existing in distinct_found):
+                # Disallow matching 'food' in 'food-grade' or 'food contact'
+                if kw == "food" and ("food-grade" in item or "food contact" in item or "food safe" in item):
+                    continue
+                # Whole word / token match for keywords to avoid partial matches
+                if re.search(r'\b' + re.escape(kw) + r'\b', item) and not any(re.search(r'\b' + re.escape(kw) + r'\b', existing.lower()) for existing in distinct_found):
                     distinct_found.append(item.title())
                     break
 

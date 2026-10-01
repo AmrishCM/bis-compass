@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { X, Send, Bot, User, BookOpen, ShieldAlert, Sparkles, RefreshCw, Globe, ExternalLink, Mic, MicOff } from 'lucide-react';
+import { X, Send, Bot, User, BookOpen, ShieldAlert, Sparkles, RefreshCw, Globe, ExternalLink, Mic, MicOff, Volume2, VolumeX } from 'lucide-react';
 import { api } from '../services/api';
 import { useSpeechRecognition } from '../hooks/useSpeechRecognition';
+import { useSpeechSynthesis } from '../hooks/useSpeechSynthesis';
 import { useLanguage } from '../i18n/LanguageContext';
 
 interface ChatDrawerProps {
@@ -29,20 +30,29 @@ interface Message {
 }
 
 export const ChatDrawer: React.FC<ChatDrawerProps> = ({ isOpen, onClose, initialStandardId }) => {
+  const { t, currentLanguage = 'en' } = useLanguage();
   const [messages, setMessages] = useState<Message[]>([
     {
       role: 'assistant',
-      content: 'Welcome to the BIS-Compass Compliance Advisor. Ask me anything regarding Indian Standards, certification requirements (ISI Mark, CRS), testing parameters, or accredited laboratories. Every answer is grounded in verified BIS standards.',
+      content:
+        'Welcome to the BIS-Compass Compliance Advisor. Ask me anything regarding Indian Standards, certification requirements (ISI Mark, CRS), testing parameters, or accredited laboratories. Every answer is grounded in verified BIS standards.',
     },
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [speakingIdx, setSpeakingIdx] = useState<number | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const { currentLanguage = 'en' } = useLanguage();
+  const { speak, isSpeaking, stopSpeaking } = useSpeechSynthesis();
   const { isListening, startListening, stopListening, isSupported: isSpeechSupported } = useSpeechRecognition({
     onResult: (text) => setInput(text),
   });
+
+  useEffect(() => {
+    if (!isSpeaking) {
+      setSpeakingIdx(null);
+    }
+  }, [isSpeaking]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -61,10 +71,40 @@ export const ChatDrawer: React.FC<ChatDrawerProps> = ({ isOpen, onClose, initial
     setIsLoading(true);
 
     try {
-      const response = await api.sendChatMessage(
-        newMessages.map((m) => ({ role: m.role, content: m.content })),
-        initialStandardId
-      );
+      // If language is not English, augment user prompt with localized guidance
+      const promptToSend =
+        currentLanguage !== 'en'
+          ? `${userText}\n\n[System Note: Please formulate your response in ${
+              currentLanguage === 'hi'
+                ? 'Hindi (हिन्दी)'
+                : currentLanguage === 'ta'
+                ? 'Tamil (தமிழ்)'
+                : currentLanguage === 'te'
+                ? 'Telugu (తెలుగు)'
+                : currentLanguage === 'kn'
+                ? 'Kannada (ಕನ್ನಡ)'
+                : currentLanguage === 'ml'
+                ? 'Malayalam (മലയാളം)'
+                : currentLanguage === 'mr'
+                ? 'Marathi (मराठी)'
+                : currentLanguage === 'bn'
+                ? 'Bengali (বাংলা)'
+                : currentLanguage === 'gu'
+                ? 'Gujarati (ગુજરાતી)'
+                : currentLanguage === 'pa'
+                ? 'Punjabi (ਪੰਜਾਬੀ)'
+                : currentLanguage === 'or'
+                ? 'Odia (ଓଡ଼ିଆ)'
+                : currentLanguage
+            }. Retain all IS standard numbers, clause numbers, and Gazette citations unaltered as per Rule 8.11.]`
+          : userText;
+
+      const payloadMessages = newMessages.map((m, idx) => ({
+        role: m.role,
+        content: idx === newMessages.length - 1 && currentLanguage !== 'en' ? promptToSend : m.content,
+      }));
+
+      const response = await api.sendChatMessage(payloadMessages, initialStandardId);
 
       if (response.success && response.message) {
         setMessages([
@@ -101,8 +141,10 @@ export const ChatDrawer: React.FC<ChatDrawerProps> = ({ isOpen, onClose, initial
               <Bot className="h-5 w-5" />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-slate-900">BIS Compliance Advisor</h3>
-              <p className="text-[11px] text-slate-500">Grounded in verified Gazette & Indian Standards</p>
+              <h3 className="text-sm font-bold text-slate-900">{t('chat_title', 'BIS Compliance Advisor')}</h3>
+              <p className="text-[11px] text-slate-500">
+                {t('chat_subtitle', 'Voice-enabled regulatory assistant powered by Bhashini')}
+              </p>
             </div>
           </div>
           <button
@@ -141,6 +183,38 @@ export const ChatDrawer: React.FC<ChatDrawerProps> = ({ isOpen, onClose, initial
                 )}
 
                 <div className="whitespace-pre-wrap">{m.content}</div>
+
+                {/* Read Aloud Button for AI responses */}
+                {m.role === 'assistant' && (
+                  <div className="flex items-center justify-between mt-2 pt-1 border-t border-slate-200/50">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (speakingIdx === idx) {
+                          stopSpeaking();
+                          setSpeakingIdx(null);
+                        } else {
+                          setSpeakingIdx(idx);
+                          speak(m.content, currentLanguage);
+                        }
+                      }}
+                      className="inline-flex items-center space-x-1 text-[10px] font-semibold text-emerald-800 hover:text-emerald-950 cursor-pointer"
+                    >
+                      {speakingIdx === idx ? (
+                        <>
+                          <VolumeX className="h-3 w-3 text-rose-600" />
+                          <span>{t('btn_stop_reading', 'Stop')}</span>
+                        </>
+                      ) : (
+                        <>
+                          <Volume2 className="h-3 w-3 text-emerald-700" />
+                          <span>{t('btn_read_aloud', 'Read Aloud')}</span>
+                        </>
+                      )}
+                    </button>
+                    <span className="text-[10px] text-slate-400 font-mono">Bhashini Voice</span>
+                  </div>
+                )}
 
                 {/* Sources Investigated */}
                 {m.sources_investigated && m.sources_investigated.length > 0 && (
@@ -211,7 +285,7 @@ export const ChatDrawer: React.FC<ChatDrawerProps> = ({ isOpen, onClose, initial
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder={`Ask about standards, testing, licensing (${(currentLanguage || 'en').toUpperCase()})...`}
+              placeholder={`${t('chat_placeholder', 'Ask about Indian Standards, QCOs, testing schemes...')} (${(currentLanguage || 'en').toUpperCase()})`}
               className="flex-1 border border-slate-300 rounded-md px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-emerald-600"
             />
             {isSpeechSupported && (
@@ -237,6 +311,7 @@ export const ChatDrawer: React.FC<ChatDrawerProps> = ({ isOpen, onClose, initial
               className="bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-white rounded-md px-3 py-2 text-xs font-semibold flex items-center space-x-1 transition cursor-pointer"
             >
               <Send className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">{t('chat_send', 'Send')}</span>
             </button>
           </div>
         </form>

@@ -14,11 +14,37 @@ import {
   PhoneCall,
   Scale,
   Sparkles,
+  Mic,
+  MicOff,
+  Volume2,
+  VolumeX,
 } from 'lucide-react';
 import { api } from '../services/api';
+import { useLanguage } from '../i18n/LanguageContext';
+import { useSpeechRecognition } from '../hooks/useSpeechRecognition';
+import { useSpeechSynthesis } from '../hooks/useSpeechSynthesis';
 
 export const ConsumerProtection: React.FC = () => {
+  const { t, currentLanguage = 'en' } = useLanguage();
   const [activeTab, setActiveTab] = useState<'huid' | 'cml' | 'grievance'>('huid');
+
+  // Voice Processing
+  const { speak, isSpeaking, stopSpeaking } = useSpeechSynthesis();
+  const {
+    isListening,
+    startListening,
+    stopListening,
+    isSupported: isSpeechSupported,
+  } = useSpeechRecognition({
+    onResult: (text) => {
+      setGrievanceForm((prev) => ({
+        ...prev,
+        incident_description: prev.incident_description
+          ? `${prev.incident_description} ${text}`
+          : text,
+      }));
+    },
+  });
 
   // HUID State
   const [huidInput, setHuidInput] = useState('');
@@ -26,6 +52,7 @@ export const ConsumerProtection: React.FC = () => {
   const [metalType, setMetalType] = useState('gold');
   const [huidResult, setHuidResult] = useState<any | null>(null);
   const [huidLoading, setHuidLoading] = useState(false);
+
 
   // CML State
   const [cmlInput, setCmlInput] = useState('');
@@ -289,15 +316,42 @@ export const ConsumerProtection: React.FC = () => {
                       HUID Format Verification: {huidResult.huid}
                     </span>
                   </div>
-                  <span
-                    className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                      huidResult.is_valid_format
-                        ? 'bg-emerald-200 text-emerald-900'
-                        : 'bg-rose-200 text-rose-900'
-                    }`}
-                  >
-                    {huidResult.is_valid_format ? 'VALID SYNTAX' : 'INVALID FORMAT'}
-                  </span>
+                  <div className="flex items-center space-x-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (isSpeaking) {
+                          stopSpeaking();
+                        } else {
+                          const speechText = huidResult.is_valid_format
+                            ? `HUID code ${huidResult.huid} is formatted correctly under Indian Standard ${huidResult.standard_reference}. For ${huidResult.matched_declared_purity?.karat || ''} purity, fineness mark is ${huidResult.matched_declared_purity?.fineness || ''}. Please verify in BIS Care app before purchase.`
+                            : `HUID code ${huidResult.huid} format is invalid. Genuine BIS HUID codes consist of exactly 6 alphanumeric characters.`;
+                          speak(speechText, currentLanguage);
+                        }
+                      }}
+                      className={`text-xs font-bold px-2.5 py-1 rounded-lg border flex items-center space-x-1.5 transition cursor-pointer ${
+                        isSpeaking
+                          ? 'bg-rose-50 border-rose-300 text-rose-700 animate-pulse'
+                          : 'bg-white hover:bg-slate-50 border-slate-300 text-slate-700'
+                      }`}
+                    >
+                      {isSpeaking ? (
+                        <VolumeX className="h-3.5 w-3.5 text-rose-600" />
+                      ) : (
+                        <Volume2 className="h-3.5 w-3.5 text-emerald-700" />
+                      )}
+                      <span>{isSpeaking ? t('btn_stop_reading', 'Stop') : t('btn_read_aloud', 'Read Aloud')}</span>
+                    </button>
+                    <span
+                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                        huidResult.is_valid_format
+                          ? 'bg-emerald-200 text-emerald-900'
+                          : 'bg-rose-200 text-rose-900'
+                      }`}
+                    >
+                      {huidResult.is_valid_format ? 'VALID SYNTAX' : 'INVALID FORMAT'}
+                    </span>
+                  </div>
                 </div>
 
                 {huidResult.is_valid_format ? (
@@ -506,15 +560,42 @@ export const ConsumerProtection: React.FC = () => {
                       License Status: {cmlResult.cml_number}
                     </span>
                   </div>
-                  <span
-                    className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                      cmlResult.is_valid_format
-                        ? 'bg-emerald-200 text-emerald-900'
-                        : 'bg-rose-200 text-rose-900'
-                    }`}
-                  >
-                    {cmlResult.is_valid_format ? 'VALID CML FORMAT' : 'INVALID FORMAT'}
-                  </span>
+                  <div className="flex items-center space-x-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (isSpeaking) {
+                          stopSpeaking();
+                        } else {
+                          const speechText = cmlResult.is_valid_format
+                            ? `CML License ${cmlResult.cml_number} conforms to standard format. Check whether the 7 or 8-digit CML number is printed directly below the official ISI logo on product packaging.`
+                            : `CML License ${cmlResult.cml_number} is invalid. ${cmlResult.error_message || ''}`;
+                          speak(speechText, currentLanguage);
+                        }
+                      }}
+                      className={`text-xs font-bold px-2.5 py-1 rounded-lg border flex items-center space-x-1.5 transition cursor-pointer ${
+                        isSpeaking
+                          ? 'bg-rose-50 border-rose-300 text-rose-700 animate-pulse'
+                          : 'bg-white hover:bg-slate-50 border-slate-300 text-slate-700'
+                      }`}
+                    >
+                      {isSpeaking ? (
+                        <VolumeX className="h-3.5 w-3.5 text-rose-600" />
+                      ) : (
+                        <Volume2 className="h-3.5 w-3.5 text-emerald-700" />
+                      )}
+                      <span>{isSpeaking ? t('btn_stop_reading', 'Stop') : t('btn_read_aloud', 'Read Aloud')}</span>
+                    </button>
+                    <span
+                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                        cmlResult.is_valid_format
+                          ? 'bg-emerald-200 text-emerald-900'
+                          : 'bg-rose-200 text-rose-900'
+                      }`}
+                    >
+                      {cmlResult.is_valid_format ? 'VALID CML FORMAT' : 'INVALID FORMAT'}
+                    </span>
+                  </div>
                 </div>
 
                 {cmlResult.is_valid_format ? (
@@ -738,9 +819,37 @@ export const ConsumerProtection: React.FC = () => {
               </div>
 
               <div>
-                <label className="block font-semibold text-slate-700 mb-1">
-                  Incident Narrative / Defect Description
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block font-semibold text-slate-700">
+                    Incident Narrative / Defect Description
+                  </label>
+                  {isSpeechSupported && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (isListening) stopListening();
+                        else startListening(currentLanguage);
+                      }}
+                      className={`flex items-center space-x-1 text-[11px] px-2 py-0.5 rounded-full border transition-all font-semibold cursor-pointer ${
+                        isListening
+                          ? 'bg-rose-50 border-rose-300 text-rose-700 animate-pulse'
+                          : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                      }`}
+                    >
+                      {isListening ? (
+                        <>
+                          <MicOff className="h-3 w-3 text-rose-600" />
+                          <span>{t('btn_listening', 'Listening...')}</span>
+                        </>
+                      ) : (
+                        <>
+                          <Mic className="h-3 w-3 text-emerald-700" />
+                          <span>{t('btn_voice_search', 'Voice Input')}</span>
+                        </>
+                      )}
+                    </button>
+                  )}
+                </div>
                 <textarea
                   rows={3}
                   placeholder="Describe what happened, e.g. tested at private lab and found to be only 18K instead of 22K billed, or product broke causing electric short circuit..."
@@ -777,13 +886,37 @@ export const ConsumerProtection: React.FC = () => {
                       Complaint Ref: {grievanceResult.complaint_id}
                     </p>
                   </div>
-                  <button
-                    onClick={() => copyToClipboard(grievanceResult.formal_complaint_letter)}
-                    className="flex items-center space-x-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition-colors"
-                  >
-                    <Copy className="h-3.5 w-3.5" />
-                    <span>{copied ? 'Copied!' : 'Copy Letter'}</span>
-                  </button>
+                  <div className="flex items-center space-x-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (isSpeaking) {
+                          stopSpeaking();
+                        } else {
+                          speak(grievanceResult.formal_complaint_letter, currentLanguage);
+                        }
+                      }}
+                      className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors cursor-pointer ${
+                        isSpeaking
+                          ? 'bg-rose-50 border-rose-300 text-rose-700 animate-pulse'
+                          : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-300'
+                      }`}
+                    >
+                      {isSpeaking ? (
+                        <VolumeX className="h-3.5 w-3.5 text-rose-600" />
+                      ) : (
+                        <Volume2 className="h-3.5 w-3.5 text-emerald-700" />
+                      )}
+                      <span>{isSpeaking ? t('btn_stop_reading', 'Stop Audio') : t('btn_read_aloud', 'Read Letter Aloud')}</span>
+                    </button>
+                    <button
+                      onClick={() => copyToClipboard(grievanceResult.formal_complaint_letter)}
+                      className="flex items-center space-x-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition-colors"
+                    >
+                      <Copy className="h-3.5 w-3.5" />
+                      <span>{copied ? 'Copied!' : 'Copy Letter'}</span>
+                    </button>
+                  </div>
                 </div>
 
                 <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg font-mono text-[11px] text-slate-800 whitespace-pre-wrap max-h-96 overflow-y-auto leading-relaxed">

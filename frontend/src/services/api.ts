@@ -536,5 +536,42 @@ export const api = {
     const res = await apiClient.post('/updates/sync');
     return res.data;
   },
+
+  // Bhashini Translation & Localization
+  async translateText(text: string, target_lang: string, source_lang: string = 'en') {
+    const res = await apiClient.post('/translate', { text, target_lang, source_lang });
+    return res.data;
+  },
+
+  async translateBatch(texts: string[], target_lang: string, source_lang: string = 'en') {
+    const res = await apiClient.post('/translate/batch', { texts, target_lang, source_lang });
+    return res.data;
+  },
+
+  async getTranslationStatus() {
+    const res = await apiClient.get('/translate/status');
+    return res.data;
+  },
+
+  // Bhashini Voice (ASR & TTS)
+  async synthesizeSpeechBhashini(text: string, language: string = 'hi', gender: string = 'female') {
+    const res = await apiClient.post('/voice/tts', { text, language, gender });
+    return res.data;
+  },
+
+  async transcribeAudioBhashini(audio_base64: string, language: string = 'hi', audio_format: string = 'wav') {
+    const res = await apiClient.post('/voice/asr', { audio_base64, language, audio_format });
+    return res.data;
+  },
+
+  async translateAndSpeak(text: string, target_language: string, source_language: string = 'en', gender: string = 'female') {
+    const res = await apiClient.post('/voice/translate-and-speak', { text, target_language, source_language, gender });
+    return res.data;
+  },
+
+  async getVoiceStatus() {
+    const res = await apiClient.get('/voice/status');
+    return res.data;
+  },
 };
 
