@@ -101,64 +101,132 @@ export const Dashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* Metrics Row - Single Column */}
-      <div className="space-y-4">
-        <div className="bg-white p-4 rounded-lg border border-slate-200 shadow-2xs">
-          <span className="text-[11px] font-semibold text-slate-500 block">
-            {t('dashboard_total_standards', 'Total Standards Monitored')}
-          </span>
-          <div className="text-2xl font-black text-slate-900 mt-1">
-            {loading ? (
-              <div className="h-8 w-24 bg-slate-200 rounded animate-pulse" />
-            ) : (
-              stats?.counts?.standards_indexed ?? 4
-            )}
+      {/* Metrics Row - 4 Column Modern Stat Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Card 1: Total Standards Monitored */}
+        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs hover:border-emerald-300 transition-all flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                Total Standards Monitored
+              </span>
+              <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                Active Catalog
+              </span>
+            </div>
+            <div className="flex items-baseline space-x-2 mt-2">
+              <span className="text-2xl font-black text-slate-900 tracking-tight">
+                24,100+
+              </span>
+              <span className="text-xs font-semibold text-slate-400">
+                (24.1K+)
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-600 mt-2 leading-relaxed">
+              Total active Indian Standards (IS Codes) published in the official Bureau of Indian Standards catalog.
+            </p>
           </div>
-          <span className="text-[10px] text-emerald-600 font-semibold flex items-center mt-1">
-            <CheckCircle2 className="h-3 w-3 mr-1" aria-hidden="true" /> Active BIS Standards
-          </span>
+          <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px]">
+            <span className="text-emerald-700 font-semibold flex items-center">
+              <CheckCircle2 className="h-3.5 w-3.5 mr-1 text-emerald-600" aria-hidden="true" /> Live Monitored
+            </span>
+            <span className="text-slate-500 font-medium bg-slate-100 px-1.5 py-0.5 rounded text-[10px]">
+              {loading ? '...' : `${stats?.counts?.standards_indexed ?? 4} Flagship Indexed`}
+            </span>
+          </div>
         </div>
 
-        <div className="bg-white p-4 rounded-lg border border-slate-200 shadow-2xs">
-          <span className="text-[11px] font-semibold text-slate-500 block">
-            {t('dashboard_mandatory_qcos', 'Mandatory QCOs')}
-          </span>
-          <div className="text-2xl font-black text-slate-900 mt-1">
-            {loading ? (
-              <div className="h-8 w-24 bg-slate-200 rounded animate-pulse" />
-            ) : (
-              stats?.counts?.mandatory_qcos ?? stats?.counts?.clauses_indexed ?? 6
-            )}
+        {/* Card 2: Mandatory QCOs (Gazette Orders) */}
+        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs hover:border-emerald-300 transition-all flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                Mandatory QCOs (Gazette)
+              </span>
+              <span className="text-[10px] font-bold text-red-700 bg-red-50 px-2 py-0.5 rounded-full border border-red-200">
+                Statutory
+              </span>
+            </div>
+            <div className="flex items-baseline space-x-2 mt-2">
+              <span className="text-2xl font-black text-slate-900 tracking-tight">
+                700+ Products
+              </span>
+              <span className="text-xs font-semibold text-slate-400">
+                (150+ QCOs)
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-600 mt-2 leading-relaxed">
+              Products brought under compulsory certification via Central Gazette notifications by DPIIT, Steel, & MeitY.
+            </p>
           </div>
-          <span className="text-[10px] text-slate-500 mt-1 block">Gazette Notified Orders</span>
+          <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px]">
+            <span className="text-red-700 font-semibold flex items-center">
+              <ShieldCheck className="h-3.5 w-3.5 mr-1 text-red-600" aria-hidden="true" /> Gazette Enforced
+            </span>
+            <span className="text-slate-500 font-medium bg-slate-100 px-1.5 py-0.5 rounded text-[10px]">
+              {loading ? '...' : `${stats?.counts?.mandatory_qcos ?? 6} Active Orders`}
+            </span>
+          </div>
         </div>
 
-        <div className="bg-white p-4 rounded-lg border border-slate-200 shadow-2xs">
-          <span className="text-[11px] font-semibold text-slate-500 block">
-            {t('certification_scheme', 'Certification Schemes')}
-          </span>
-          <div className="text-2xl font-black text-slate-900 mt-1">
-            {loading ? (
-              <div className="h-8 w-24 bg-slate-200 rounded animate-pulse" />
-            ) : (
-              stats?.counts?.certification_schemes ?? 3
-            )}
+        {/* Card 3: Certification Schemes */}
+        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs hover:border-emerald-300 transition-all flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                Certification Schemes
+              </span>
+              <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-200">
+                Compliance
+              </span>
+            </div>
+            <div className="flex items-baseline space-x-2 mt-2">
+              <span className="text-2xl font-black text-slate-900 tracking-tight">
+                6 Primary Schemes
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-600 mt-2 leading-relaxed">
+              <strong className="text-slate-800">Scheme-I</strong> (ISI), <strong className="text-slate-800">Scheme-II</strong> (CRS), <strong className="text-slate-800">FMCS</strong>, <strong className="text-slate-800">Hallmarking</strong> (HUID), <strong className="text-slate-800">CoC</strong>, and <strong className="text-slate-800">LRS</strong>.
+            </p>
           </div>
-          <span className="text-[10px] text-emerald-600 font-semibold mt-1 block">Scheme I & II (CRS)</span>
+          <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px]">
+            <span className="text-indigo-700 font-semibold flex items-center">
+              <Sparkles className="h-3.5 w-3.5 mr-1 text-indigo-600" aria-hidden="true" /> Multi-Scheme
+            </span>
+            <span className="text-slate-500 font-medium bg-slate-100 px-1.5 py-0.5 rounded text-[10px]">
+              {loading ? '...' : `${stats?.counts?.certification_schemes ?? 3} Active Models`}
+            </span>
+          </div>
         </div>
 
-        <div className="bg-white p-4 rounded-lg border border-slate-200 shadow-2xs">
-          <span className="text-[11px] font-semibold text-slate-500 block">
-            {t('dashboard_accredited_labs', 'Recognized Laboratories')}
-          </span>
-          <div className="text-2xl font-black text-slate-900 mt-1">
-            {loading ? (
-              <div className="h-8 w-24 bg-slate-200 rounded animate-pulse" />
-            ) : (
-              stats?.counts?.recognized_laboratories ?? 6
-            )}
+        {/* Card 4: Recognized Laboratories */}
+        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs hover:border-emerald-300 transition-all flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                Recognized Laboratories
+              </span>
+              <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
+                NABL & BIS
+              </span>
+            </div>
+            <div className="flex items-baseline space-x-2 mt-2">
+              <span className="text-2xl font-black text-slate-900 tracking-tight">
+                Hundreds Nationwide
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-600 mt-2 leading-relaxed">
+              Nationwide network of Central BIS, National Test House (NTH), CPRI, ERTL, CFTRI, and CIPET testing labs.
+            </p>
           </div>
-          <span className="text-[10px] text-slate-500 mt-1 block">NABL & BIS Recognized</span>
+          <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px]">
+            <span className="text-amber-700 font-semibold flex items-center">
+              <Building2 className="h-3.5 w-3.5 mr-1 text-amber-600" aria-hidden="true" /> Verified Testing
+            </span>
+            <span className="text-slate-500 font-medium bg-slate-100 px-1.5 py-0.5 rounded text-[10px]">
+              {loading ? '...' : `${stats?.counts?.recognized_laboratories ?? 6} Benchmark Labs`}
+            </span>
+          </div>
         </div>
       </div>
 
