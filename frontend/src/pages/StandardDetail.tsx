@@ -37,7 +37,7 @@ interface SchemeItem {
 }
 
 interface StandardDetailData {
-  id: number;
+  id: number | string;
   standard_number: string;
   title: string;
   scope: string;
@@ -83,7 +83,8 @@ export const StandardDetail: React.FC = () => {
       setLoading(true);
       setError(null);
       try {
-        const res = await api.getStandardDetail(Number(id));
+        const queryId = isNaN(Number(id)) ? id : Number(id);
+        const res = await api.getStandardDetail(queryId);
         if (res.success && res.standard) {
           setStandard(res.standard);
         } else {

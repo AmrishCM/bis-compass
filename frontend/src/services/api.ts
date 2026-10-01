@@ -420,7 +420,7 @@ export const api = {
   },
 
   // Standards
-  async getStandards(params?: { q?: string; status?: string; limit?: number; offset?: number }) {
+  async getStandards(params?: { q?: string; status?: string; division?: string; limit?: number; offset?: number }) {
     const res = await apiClient.get('/standards', { params });
     return res.data;
   },
@@ -430,7 +430,7 @@ export const api = {
     return res.data;
   },
 
-  async getStandardDetail(id: number) {
+  async getStandardDetail(id: number | string) {
     const res = await apiClient.get(`/standards/${id}`);
     return res.data;
   },
@@ -498,7 +498,7 @@ export const api = {
   },
 
   // Standard Dependencies
-  async getStandardDependencies(id: number) {
+  async getStandardDependencies(id: number | string) {
     const res = await apiClient.get(`/standards/${id}/dependencies`);
     return res.data;
   },
