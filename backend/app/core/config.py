@@ -52,6 +52,12 @@ class Settings(BaseSettings):
     MAX_UPLOAD_SIZE: int = 10485760  # 10MB
     UPLOAD_DIR: str = "uploads"
 
+    @property
+    def safe_upload_dir(self) -> str:
+        if self.UPLOAD_DIR.startswith("/app"):
+            return "uploads"
+        return self.UPLOAD_DIR
+
     class Config:
         env_file = ".env"
         case_sensitive = True
